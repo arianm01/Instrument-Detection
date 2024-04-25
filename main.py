@@ -1,126 +1,84 @@
-import pandas as pd
-import numpy as np
-from keras.saving.save import load_model
-
-from sklearn.model_selection import train_test_split, KFold
-from sklearn.preprocessing import LabelEncoder
 import os
-import pickle
-import librosa
-import librosa.display
-import matplotlib.pyplot as plt
 import numpy as np
-from basic_pitch.inference import predict, predict_and_save
-from basic_pitch import ICASSP_2022_MODEL_PATH
-import soundfile as sf
-import mido
-from midiutil.MidiFile import MIDIFile
+import librosa
+import matplotlib.pyplot as plt
+from keras.models import load_model
+from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.preprocessing import LabelEncoder
 
-from Models.Instrument.Kaggle import CNNModel, lstmModel
+from Models.Instrument.Kaggle import cnn_model, custom_model
 from utility import InstrumentDataset
-import tensorflow as tf
-
 from utility.InstrumentDataset import plot_history, plot_confusion_matrix
-from utility.utils import testGPU
+from utility.utils import testGPU, reshape_data
 
+TIME_FRAME = 5
+
+# Initialize GPU configuration
 testGPU()
 
 
-def extract(signal, frame_size, hop_length):
-    stft = librosa.stft(signal,
-                        n_fft=frame_size,
-                        hop_length=hop_length)[:-1]
+def extract_features(signal, frame_size, hop_length):
+    """ Extract log spectrogram features from the signal """
+    stft = librosa.stft(signal, n_fft=frame_size, hop_length=hop_length)[:-1]
     spectrogram = np.abs(stft)
     log_spectrogram = librosa.amplitude_to_db(spectrogram)
     return log_spectrogram
 
 
-# signal = load_signal("./input/000001.mp3.wav", 22050)
-# temp = extract(signal, 512, 256)
-#
-# plt.figure(figsize=(10, 4))
-# librosa.display.specshow(temp, sr=22050, x_axis='time', y_axis='log')
-# plt.colorbar(format='%+2.0f dB')
-# plt.title('Spectrogram')
-# plt.tight_layout()
-# plt.show()
+def load_data():
+    """ Load and preprocess data """
+    x, y, classes = InstrumentDataset.read_data('Dataset', 1)
+    X = np.array(x)[..., np.newaxis]  # Add an extra dimension for the channels
+    print(f'The shape of X is {X.shape}')
+    print(f'The shape of y is {y.shape}')
+    return X, y, classes
 
 
-x, y, classes = InstrumentDataset.read_data('./input')
+def train_models(X, y, classes):
+    """ Train models using K-fold cross-validation """
+    n_splits = 5
+    if y.ndim > 1:
+        y_labels = np.argmax(y, axis=1)
+    else:
+        y_labels = y
 
-# classes = os.listdir('./input')
-X = np.array(x)[..., np.newaxis]  # Add an extra dimension for the channels
+    X = reshape_data(X, TIME_FRAME)
 
-print(f'the shape of x is {len(x), len(x[0]), len(x[0][0])}')
-print(f'the shape of y is {y.shape}')
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    histories = []
 
-n_splits = 5
-kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-#
-fold_no = 1
-histories = []
-for train_index, test_index in kf.split(X):
-    X_train_fold, X_test_fold = X[train_index], X[test_index]
-    y_train_fold, y_test_fold = y[train_index], y[test_index]
+    for fold_no, (train_index, test_index) in enumerate(skf.split(X, y_labels), start=1):
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
 
-    his = CNNModel(X_train_fold, y_train_fold, X_test_fold, y_test_fold, fold_no)
+        print(f'Training fold {fold_no}...')
+        input_shape = (X_train.shape[1], X_train.shape[2], X_train.shape[3], 1)
+        num_classes = y_train.shape[1]
+        layer_sizes = [512, 256, 128, 64, 32]
+        history = custom_model(input_shape, num_classes, fold_no, X_train, y_train, X_test, y_test)
+        histories.append(history)
+        fold_no += 1
 
-    print(f'Training fold {fold_no}...')
+    return histories
 
-    histories.append(his)
-    model = load_model(f'model_best_CNN_{fold_no}.h5')
-    predictions = model.predict(X_test_fold)
-    #
+
+def evaluate_models(X, y, classes):
+    """ Evaluate models on a separate test set """
+    model_path = '../Models/Instrument/Finetune/model_best_CNN_1.h5'
+    model = load_model(model_path)
+    predictions = model.predict(X)
     y_pred_labels = np.argmax(predictions, axis=1)
-    #
-    # # Ensure y_test is also in the correct format
-    # # If y_test is one-hot encoded, convert it to class labels as well
-    y_test_labels = np.argmax(y_test_fold, axis=1) if y_test_fold.ndim > 1 else y_test_fold
+    y_true_labels = np.argmax(y, axis=1) if y.ndim > 1 else y
+    plot_confusion_matrix(y_true_labels, y_pred_labels, classes)
 
-    plot_confusion_matrix(y_test_labels, y_pred_labels, classes)
 
-    fold_no += 1
+def main():
+    X, y, classes = load_data()
+    histories = train_models(X, y, classes)
 
-# X_train, X_test, y_train, y_test = train_test_split(np.array(x), y, test_size=0.2, random_state=42)
-#
-# print(X_train.shape, X_test.shape)
-#
-# his = CNNModel(X_train, y_train, X_test, y_test)
-# # his = lstmModel(X_train, y_train, X_test, y_test)
-model_path = 'model_best_CNN_1.h5'
-#
-# # Load the model
-#
-for history in histories:
-    plot_history(history)
+    for history in histories:
+        plot_history(history)
 
-# # create your MIDI object
-# mf = MIDIFile(1)     # only 1 track
-# track = 0   # the only track
-#
-# time = 0    # start at the beginning
-# mf.addTrackName(track, time, "Sample Track")
-# mf.addTempo(track, time, 120)
-#
-# # add some notes
-# channel = 0
-# volume = 100
-#
-# pitch = 60           # C4 (middle C)
-# time = 0             # start on beat 0
-# duration = 1         # 1 beat long
-# mf.addNote(track, channel, pitch, time, duration, volume)
-#
-# pitch = 64           # E4
-# time = 2             # start on beat 2
-# duration = 1         # 1 beat long
-# mf.addNote(track, channel, pitch, time, duration, volume)
-#
-# pitch = 67           # G4
-# time = 4             # start on beat 4
-# duration = 1         # 1 beat long
-# mf.addNote(track, channel, pitch, time, duration, volume)
-#
-# # write it to disk
-# with open("output.mid", 'wb') as outf:
-#     mf.writeFile(outf)
+
+if __name__ == '__main__':
+    main()

@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 
 
@@ -14,3 +15,16 @@ def testGPU():
             # Memory growth must be set before GPUs have been initialized
             print(e)
     tf.config.list_physical_devices('GPU')
+
+
+def reshape_data(data, time_steps):
+    num_samples = data.shape[0]
+    num_frames = int(data.shape[1] / time_steps) * time_steps
+    num_mfcc = 13
+    num_channels = 1
+    frames_per_step = num_frames // time_steps  # This should be 43 time steps
+
+    # Reshape the data
+    new_shape = (num_samples, time_steps, frames_per_step, num_mfcc, num_channels)
+
+    return np.reshape(data[:, :num_frames, :, :], new_shape)

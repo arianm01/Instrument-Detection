@@ -1,13 +1,11 @@
 import os
-from tkinter import Toplevel
-import tkinter as tk
 
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
+from imblearn.over_sampling import SMOTE
 
 import librosa
 
@@ -18,24 +16,66 @@ def load_signal(file_path, SAMPLE_RATE):
     return signal
 
 
-def read_data(dataset_path):
-    hop_length = 512
-    n_fft = 2048
-    x, y = [], []
+def read_data(dataset_path, merge_factor, duration=5, n_mfcc=13, n_fft=2048, hop_length=512):
+    """
+    Reads audio files from the dataset directory, computes MFCC features, and returns them with labels.
+    Optionally merges multiple audio samples into one data point based on the merge factor.
+
+    Parameters:
+        dataset_path (str): Path to the dataset directory.
+        duration (float): Duration of audio clips for processing (in seconds).
+        n_mfcc (int): Number of MFCCs to return.
+        n_fft (int): Length of the FFT window.
+        hop_length (int): Number of samples between successive frames.
+        merge_factor (int): Number of audio samples to merge into one data point.
+
+    Returns:
+        tuple: Tuple containing:
+            - x (list of np.array): MFCCs of each audio file (or merged files).
+            - y (np.array): One-hot encoded class labels.
+            - classes (list): List of class names.
+    """
+    x, y, signals = [], [], []
     classes = os.listdir(dataset_path)
     print(classes)
-    for classe in classes:
-        print(classe)
-        files = os.listdir(os.path.join(dataset_path, str(classe)))
+    for instrument in classes:
+        print(instrument)
+        files = os.listdir(os.path.join(dataset_path, str(instrument)))
+        i = 1
+        baseSignal = None
         for file in tqdm(files):
-            file_path = os.path.join(dataset_path, str(classe), str(file))
-            signal, sample_rate = librosa.load(file_path, duration=4)
-            MFCCs = librosa.feature.mfcc(y=signal, sr=sample_rate, n_fft=n_fft, hop_length=hop_length, n_mfcc=13)
+            file_path = os.path.join(dataset_path, str(instrument), str(file))
+            signal, sample_rate = librosa.load(file_path, duration=duration)
+            if i < merge_factor:
+                if baseSignal is not None:
+                    baseSignal = np.concatenate([baseSignal, signal], axis=0)
+                else:
+                    baseSignal = signal
+                i += 1
+                continue
+            else:
+                if baseSignal is not None:
+                    baseSignal = np.concatenate([baseSignal, signal], axis=0)
+                else:
+                    baseSignal = signal
+                i = 1
+            MFCCs = librosa.feature.mfcc(y=baseSignal, sr=sample_rate, n_fft=n_fft, hop_length=hop_length,
+                                         n_mfcc=n_mfcc)
             # here we will use both of these values and see which one is better
             # I think the use of the transpose is for the shapes to be correct
             mfcc = MFCCs.T
+            # signals.append(baseSignal)
             x.append(mfcc)
-            y.append(classe)
+            y.append(instrument)
+            baseSignal = None
+
+    # print(len(signals), len(y))
+    # smote = SMOTE(random_state=42)
+    # x_resampled, y_resampled = smote.fit_resample(signals, y)
+    # signals.extend(x_resampled)
+    # y.extend(y_resampled)
+    # print(len(signals), len(y))
+
     y = np.array(pd.get_dummies(y))
     return x, y, classes
 
@@ -74,6 +114,27 @@ def plot_confusion_matrix(y_true, y_pred, classes, normalize=True, title=None, c
 
     # Compute confusion matrix
     cm = confusion_matrix(y_true, y_pred)
+    print("Confusion Matrix shape:", cm.shape)
+    print("Number of labels:", len(classes))
+
+    # # Assuming cm is your confusion matrix and is a numpy array
+    # num_classes = cm.shape[0]
+    # class_accuracies = {}
+    #
+    # for i in range(num_classes):
+    #     TP = cm[i, i]
+    #     FP = np.sum(cm[:, i]) - TP
+    #     FN = np.sum(cm[i, :]) - TP
+    #     TN = np.sum(cm) - (FP + FN + TP)
+    #
+    #     # Calculate the accuracy per class
+    #     accuracy = (TP + TN) / (TP + FP + FN + TN)
+    #     class_accuracies[classes[i]] = accuracy
+    #
+    # # Printing accuracies for each class
+    # for class_name, accuracy in class_accuracies.items():
+    #     print(f"Accuracy for class {class_name}: {accuracy:.2f}")
+
     if normalize:
         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
 

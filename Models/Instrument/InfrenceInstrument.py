@@ -1,75 +1,113 @@
 import os
-from collections import Counter
-
 import librosa
 import numpy as np
+from collections import Counter
 from pydub import AudioSegment
+from sklearn.metrics import confusion_matrix, f1_score
 from tensorflow.keras.models import load_model
 
+from utility.InstrumentDataset import plot_confusion_matrix
 
-def preprocess_audio(audio_path, segment_duration=4, n_mfcc=13):
-    """
-    Load an audio file, slice it into 5-second segments, and extract MFCC features for each segment.
-    """
-    # Load the full audio file
-    signal, sample_rate = librosa.load(audio_path)
-
-    # Calculate the number of samples per segment
-    samples_per_segment = int(sample_rate * segment_duration)
-
-    # Determine the total number of segments
-    num_segments = int(np.ceil(len(signal) / samples_per_segment))
-
-    segments = []
-
-    for segment in range(num_segments):
-        # Calculate the start and end sample for the current segment
-        start_sample = samples_per_segment * segment
-        end_sample = start_sample + samples_per_segment
-        print("Start sample", start_sample, end_sample)
-        # If we're not at the end of the signal
-        if end_sample <= len(signal):
-            # Extract the segment
-            segment_signal = signal[start_sample:end_sample]
-
-            # Compute the MFCCs
-            mfcc = librosa.feature.mfcc(y=segment_signal, sr=sample_rate, n_fft=2048, hop_length=512, n_mfcc=n_mfcc)
-            segments.append(mfcc.T)
-
-    return np.array(segments)
+label_mapping = {0: 14, 1: 6, 2: 11, 3: 12, 4: 7}
 
 
-def predict(audio_path, model_path='../../model_best_CNN_1.h5'):
-    """
-    Predict the class of each segment of an audio file.
-    """
-    # Preprocess the audio to get its segments
+def preprocess_audio(audio_path, segment_duration=15, n_mfcc=13):
+    try:
+        signal, sample_rate = librosa.load(audio_path)
+        samples_per_segment = int(sample_rate * segment_duration)
+        num_segments = int(np.ceil(len(signal) / samples_per_segment))
+        segments = []
+
+        for segment in range(num_segments):
+            start_sample = samples_per_segment * segment
+            end_sample = start_sample + samples_per_segment
+            if end_sample <= len(signal):
+                segment_signal = signal[start_sample:end_sample]
+                mfcc = librosa.feature.mfcc(y=segment_signal, sr=sample_rate, n_fft=2048, hop_length=512, n_mfcc=n_mfcc)
+                segments.append(mfcc.T)
+        return np.array(segments)
+    except Exception as e:
+        print(f"Error processing {audio_path}: {str(e)}")
+        return np.array([])
+
+
+def predict(audio_path, model):
     segments = preprocess_audio(audio_path)
-
-    # Add a new axis to match the input shape of the model
+    if segments.size == 0:
+        return np.array([])
     segments = segments[..., np.newaxis]
-
-    # Load the trained model
-    model = load_model(model_path)
-
-    # Predict
-    predictions = model.predict(segments)
-
-    # Convert predictions to class labels if necessary
-    return np.argmax(predictions, axis=1)
+    try:
+        predictions = model.predict(segments)
+        return np.argmax(predictions, axis=1)
+    except Exception as e:
+        print(f"Error during prediction for {audio_path}: {str(e)}")
+        return np.array([])
 
 
-# Example usage
-audio_path = '../../Test/2_0_01_00.mp3'
-predicted_labels = predict(audio_path)
+audio_path = '../../../../archive/NavaDataset'
+try:
+    with open(audio_path + '/test.txt', 'r') as file:
+        files = [line.strip() for line in file.readlines()]
+except FileNotFoundError:
+    print("File not found.")
+    files = []
+
 classes = os.listdir('../../input')
-print(predicted_labels)
-for labels in predicted_labels:
-    print(classes[labels])
+true_labels = []
+predicted_labels = []
 
-label_counts = Counter(predicted_labels)
 
-# Print the count of each class
-for label, count in label_counts.items():
-    class_name = classes[label]
-    print(f"Class '{class_name}' appears {count} times in predictions.")
+def extract_label(file_name):
+    try:
+        return label_mapping[int(file_name[0])]
+    except (IndexError, ValueError, KeyError):
+        return None
+
+
+model = load_model('../../model_best_CNN_3.h5')
+
+for file in files:
+    true_label = extract_label(file)
+    predicted_label = predict(audio_path + '/Data/' + file + '.mp3', model)
+    true_labels.extend([true_label] * len(predicted_label))
+    predicted_labels.extend(predicted_label)
+    if predicted_label.size > 0:
+        label_counts = Counter(predicted_label)
+        for label, count in label_counts.items():
+            class_name = classes[label]
+            print(f"Class '{class_name}' appears {count} times in predictions for {file}.")
+    else:
+        print(f"No predictions for {file}.")
+
+# plot_confusion_matrix(true_labels, predicted_labels, list(label_mapping.values()))
+conf_matrix = confusion_matrix(true_labels, predicted_labels, labels=list(label_mapping.values()))
+print(f"Confusion matrix", conf_matrix)
+class_accuracies = {}
+total_true_positives, total_predict = 0, 0
+for i, class_label in enumerate(label_mapping.values()):
+    true_positives = conf_matrix[i, i]
+    total_predictions = conf_matrix[:, i].sum()
+    total_true_positives += true_positives
+    total_predict += total_predictions
+    if total_predictions > 0:
+        accuracy = true_positives / total_predictions
+    else:
+        accuracy = 0  # To handle division by zero if there are no predictions for this class
+    class_accuracies[class_label] = accuracy
+
+# Print accuracy for each class
+for label, acc in class_accuracies.items():
+    print(f"Accuracy for class {label}: {acc:.2f}")
+
+accuracy = total_true_positives / total_predict
+print(f"Total Accuracy {total_true_positives}, {total_predict}: {accuracy}")
+
+
+f1_scores = f1_score(true_labels, predicted_labels, labels=list(label_mapping.values()), average=None)
+macro_f1_score = f1_score(true_labels, predicted_labels, average='weighted')
+
+# Print F1 score for each class
+for i, label in enumerate(label_mapping.values()):
+    print(f"F1 Score for class {label}: {f1_scores[i]:.2f}")
+
+print(f"Macro-average F1 Score: {macro_f1_score:.2f}")
