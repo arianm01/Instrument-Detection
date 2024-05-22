@@ -1,12 +1,13 @@
 import numpy as np
 import librosa
 from keras.layers import TimeDistributed, Conv2D, BatchNormalization, MaxPooling2D, Dropout, Flatten, LSTM, Dense
+from sklearn.utils import class_weight
 from tensorflow.keras import Sequential, callbacks, layers, regularizers, models
 from sklearn.model_selection import KFold
 
 # Set constants for the learning rate schedule
 INITIAL_LEARNING_RATE = 0.0001
-DECAY_RATE = 0.001
+DECAY_RATE = 0.0001
 MIN_LEARNING_RATE = 0.00005
 
 

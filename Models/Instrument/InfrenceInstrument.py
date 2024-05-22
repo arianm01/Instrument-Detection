@@ -2,6 +2,8 @@ import os
 import librosa
 import numpy as np
 from collections import Counter
+
+import pandas as pd
 from pydub import AudioSegment
 from sklearn.metrics import confusion_matrix, f1_score
 from tensorflow.keras.models import load_model
@@ -11,10 +13,25 @@ from utility.InstrumentDataset import plot_confusion_matrix
 label_mapping = {0: 14, 1: 6, 2: 11, 3: 12, 4: 7}
 
 
-def preprocess_audio(audio_path, segment_duration=15, n_mfcc=13):
+def get_mask(y, sample_rate):
+    mask = []
+    y = pd.Series(y).apply(np.abs)
+    y_mean = y.rolling(window=int(sample_rate / 10),
+                       min_periods=1,
+                       center=True).mean()
+    for mean in y_mean:
+        if mean > 0.001:
+            mask.append(True)
+        else:
+            mask.append(False)
+    return mask
+
+
+def preprocess_audio(audio_path, segment_duration=2, n_mfcc=13):
     try:
-        signal, sample_rate = librosa.load(audio_path)
+        signal, sample_rate = librosa.load(audio_path, sr=16000)
         samples_per_segment = int(sample_rate * segment_duration)
+        signal = signal[get_mask(signal, sample_rate)]
         num_segments = int(np.ceil(len(signal) / samples_per_segment))
         segments = []
 
@@ -23,7 +40,7 @@ def preprocess_audio(audio_path, segment_duration=15, n_mfcc=13):
             end_sample = start_sample + samples_per_segment
             if end_sample <= len(signal):
                 segment_signal = signal[start_sample:end_sample]
-                mfcc = librosa.feature.mfcc(y=segment_signal, sr=sample_rate, n_fft=2048, hop_length=512, n_mfcc=n_mfcc)
+                mfcc = librosa.feature.mfcc(y=segment_signal, sr=sample_rate, n_fft=512, hop_length=512, n_mfcc=n_mfcc)
                 segments.append(mfcc.T)
         return np.array(segments)
     except Exception as e:
@@ -52,7 +69,7 @@ except FileNotFoundError:
     print("File not found.")
     files = []
 
-classes = os.listdir('../../input')
+classes = os.listdir('../../Dataset')
 true_labels = []
 predicted_labels = []
 
@@ -64,7 +81,7 @@ def extract_label(file_name):
         return None
 
 
-model = load_model('../../model_best_CNN_3.h5')
+model = load_model('../../model_best_CNN_1.h5')
 
 for file in files:
     true_label = extract_label(file)
@@ -81,7 +98,7 @@ for file in files:
 
 # plot_confusion_matrix(true_labels, predicted_labels, list(label_mapping.values()))
 conf_matrix = confusion_matrix(true_labels, predicted_labels, labels=list(label_mapping.values()))
-print(f"Confusion matrix", conf_matrix)
+print('Confusion matrix', conf_matrix)
 class_accuracies = {}
 total_true_positives, total_predict = 0, 0
 for i, class_label in enumerate(label_mapping.values()):
@@ -97,11 +114,10 @@ for i, class_label in enumerate(label_mapping.values()):
 
 # Print accuracy for each class
 for label, acc in class_accuracies.items():
-    print(f"Accuracy for class {label}: {acc:.2f}")
+    print(f"Accuracy for class {label}: {acc * 100:.2f}")
 
 accuracy = total_true_positives / total_predict
-print(f"Total Accuracy {total_true_positives}, {total_predict}: {accuracy}")
-
+print(f"Total Accuracy {total_true_positives}, {total_predict}: {accuracy * 100}")
 
 f1_scores = f1_score(true_labels, predicted_labels, labels=list(label_mapping.values()), average=None)
 macro_f1_score = f1_score(true_labels, predicted_labels, average='weighted')
