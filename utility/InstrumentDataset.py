@@ -18,6 +18,10 @@ def load_signal(file_path, SAMPLE_RATE):
     return signal
 
 
+def contains(main_string, substring):
+    return substring in main_string
+
+
 def read_data(dataset_path, merge_factor, duration=1, n_mfcc=13, n_fft=512, hop_length=512):
     """
     Reads audio files from the dataset directory, computes MFCC features, and returns them with labels.
@@ -37,66 +41,73 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=13, n_fft=512, hop_
             - y (np.array): One-hot encoded class labels.
             - classes (list): List of class names.
     """
-    x, y, signals = [], [], []
-    classes = os.listdir(dataset_path)
+    x, y = [], []
+    classes = ['Tar', 'Kamancheh', 'Santur', 'Setar', 'Ney']
     print(classes)
+
     for instrument in classes:
         print(instrument)
         files = os.listdir(os.path.join(dataset_path, str(instrument)))
-        baseSignal = None
-        for i, file in enumerate(tqdm(files)):
-            file_path = os.path.join(dataset_path, str(instrument), str(file))
-            signal, sample_rate = librosa.load(file_path, duration=duration, sr=16000)
-            if i == 3600:
-                break
-            seg = i + 1
-            if seg % merge_factor != 0:
-                if baseSignal is not None:
-                    baseSignal = np.concatenate([baseSignal, signal], axis=0)
-                else:
-                    baseSignal = signal
-                continue
-            else:
-                if baseSignal is not None:
-                    baseSignal = np.concatenate([baseSignal, signal], axis=0)
-                else:
-                    baseSignal = signal
-            MFCCs = librosa.feature.mfcc(y=baseSignal, sr=sample_rate, n_fft=n_fft, hop_length=hop_length,
-                                         n_mfcc=n_mfcc)
-            # here we will use both of these values and see which one is better
-            # I think the use of the transpose is for the shapes to be correct
-            mfcc = MFCCs.T
-            x.append(mfcc)
-            y.append(instrument)
-            baseSignal = None
+        process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y)
 
-    max_length = max(mfcc.shape[0] for mfcc in x)
-    x_padded = [np.pad(mfcc, ((0, max_length - mfcc.shape[0]), (0, 0)), mode='constant') if mfcc.shape[
-                                                                                                0] < max_length else mfcc[
-                                                                                                                     :max_length]
-                for mfcc in x]
-
-    # Flatten MFCC features for SMOTE
-    x_flat = [mfcc.flatten() for mfcc in x_padded]
     print(len(x), len(y))
-
-    label_to_index, index_to_label = create_label_mapping(y)
+    label_to_index, _ = create_label_mapping(y)
     y = convert_labels_to_indices(y, label_to_index)
 
     target_count = max(np.bincount(y))  # Adjust target count as needed
     print(target_count)
-    x = np.array(x)
-    x, y = balance_dataset_with_augmentation(x, y, 16000, target_count)
+    x, y = balance_dataset_with_augmentation(np.array(x), y, 16000, target_count)
     y = np.array(pd.get_dummies(y))
-    # Resample using SMOTE
-    # x_resampled, y_resampled = SMOTEENN().fit_resample(np.array(x_flat), y)
-    #
-    # # Reshape resampled data back to original MFCC shape
-    # mfcc_shape = x_padded[0].shape
-    # x_resampled = [resampled.reshape(mfcc_shape) for resampled in x_resampled]
 
-    print(len(x), len(y))
+    print(x[0], len(y))
     return x, y, classes
+
+
+def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y):
+    baseSignal, seg, last_file = None, 1, ''
+    for i, file in enumerate(tqdm(files)):
+        file_path = os.path.join(dataset_path, instrument, file)
+        signal, sample_rate = librosa.load(file_path, duration=duration, sr=16000)
+
+        if i == 12600:
+            break
+
+        if not contains(file, last_file[:-9]):
+            baseSignal, seg = None, 1
+
+        if seg % merge_factor != 0:
+            baseSignal = concatenate_signals(baseSignal, signal)
+            last_file, seg = file, seg + 1
+            continue
+
+        baseSignal = concatenate_signals(baseSignal, signal)
+        last_file = file
+
+        mfcc = compute_mfcc(baseSignal, sample_rate, n_mfcc, n_fft, hop_length)
+        x.append(mfcc)
+        y.append(instrument)
+        baseSignal, seg = None, 1
+
+
+def concatenate_signals(baseSignal, signal):
+    if baseSignal is not None:
+        return np.concatenate([baseSignal, signal], axis=0)
+    return signal
+
+
+def compute_mfcc(signal, sample_rate, n_mfcc, n_fft, hop_length):
+    MFCCs = librosa.feature.mfcc(y=signal, sr=sample_rate, n_fft=n_fft, hop_length=hop_length, n_mfcc=n_mfcc)
+    return normalize_mfccs(MFCCs).T  # Normalize MFCCs
+
+
+def normalize_mfccs(mfccs):
+    # Calculate mean and standard deviation of the MFCCs
+    mean = np.mean(mfccs, axis=0)
+    std = np.std(mfccs, axis=0)
+
+    # Apply Z-score normalization
+    normalized_mfccs = (mfccs - mean) / std
+    return normalized_mfccs
 
 
 def plot_history(history):

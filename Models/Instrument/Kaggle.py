@@ -1,6 +1,7 @@
 import numpy as np
 import librosa
-from keras.layers import TimeDistributed, Conv2D, BatchNormalization, MaxPooling2D, Dropout, Flatten, LSTM, Dense
+from keras.layers import TimeDistributed, Conv2D, BatchNormalization, MaxPooling2D, Dropout, Flatten, LSTM, Dense, \
+    Activation
 from sklearn.utils import class_weight
 from tensorflow.keras import Sequential, callbacks, layers, regularizers, models
 from sklearn.model_selection import KFold
@@ -96,11 +97,38 @@ def custom_model(input_shape, num_classes, fold, X_train, y_train, X_test, y_tes
 
     # Compile the model
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-
-    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
     model_checkpoint_path = f'model_best_lstm_{fold}.h5'
     model_checkpoint_callback = callbacks.ModelCheckpoint(
         filepath=model_checkpoint_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
 
     return model.fit(X_train, y_train, validation_data=(X_test, y_test),
                      batch_size=256, epochs=200, callbacks=[model_checkpoint_callback])
+
+
+def create_classifier_model(input_dim, num_classes):
+    """ Create a more complex classifier model """
+    model = Sequential()
+
+    # Input layer
+    model.add(Dense(512, input_shape=input_dim))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
+    model.add(Dropout(0.4))
+
+    # Hidden layer 1
+    model.add(Dense(256))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
+    model.add(Dropout(0.4))
+
+    # Hidden layer 2
+    model.add(Dense(128))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
+    model.add(Dropout(0.4))
+
+    # Output layer
+    model.add(Dense(num_classes, activation='softmax'))
+
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    return model

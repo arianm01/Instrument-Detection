@@ -8,14 +8,17 @@ from keras import Input, Model
 from keras.callbacks import ModelCheckpoint
 from keras.layers import Lambda
 from keras.models import load_model
-from sklearn.model_selection import KFold, StratifiedKFold
+from keras.utils import to_categorical
+from keras.utils.version_utils import callbacks
+from sklearn.metrics import classification_report
+from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from sklearn.preprocessing import LabelEncoder
 import tensorflow.keras.backend as K
 from sklearn.utils import compute_class_weight
 
 from Models.Instrument.ContrastiveLearning import generate_pairs, create_base_network, euclidean_distance, \
-    contrastive_loss, generate_embeddings
-from Models.Instrument.Kaggle import cnn_model, custom_model
+    contrastive_loss, generate_embeddings, evaluate_combined_contrastive_model
+from Models.Instrument.Kaggle import cnn_model, custom_model, create_classifier_model
 from utility import InstrumentDataset
 from utility.EuclideanDistanceLayer import EuclideanDistanceLayer
 from utility.InstrumentDataset import plot_history, plot_confusion_matrix
@@ -37,7 +40,7 @@ def extract_features(signal, frame_size, hop_length):
 
 def load_data():
     """ Load and preprocess data """
-    x, y, classes = InstrumentDataset.read_data('Models/Instrument/audio_segments_test', 1, duration=1)
+    x, y, classes = InstrumentDataset.read_data('./Models/Instrument/audio_segments_test/output', 5, duration=1)
     print(np.array(x).shape)
     X = np.array(x)[..., np.newaxis]  # Add an extra dimension for the channels
     print(f'The shape of X is {X.shape}')
@@ -67,7 +70,7 @@ def train_models(x, y):
         num_classes = y_train.shape[1]
         layer_sizes = [256, 128, 64, 32]
         # history = custom_model(input_shape, num_classes, fold_no, X_train, y_train, X_test, y_test)
-        history = cnn_model(input_shape, num_classes, layer_sizes, x_train, y_train, x_test, y_test, fold_no, 256, 200)
+        history = cnn_model(input_shape, num_classes, layer_sizes, x_train, y_train, x_test, y_test, fold_no, 128, 200)
         histories.append(history)
         fold_no += 1
 
@@ -115,7 +118,7 @@ def train_contrastive_model(x, y):
 
         model = Model(inputs=[input_a, input_b], outputs=distance)
 
-        model.compile(loss=contrastive_loss, optimizer='adam', metrics=['accuracy'])
+        model.compile(loss=contrastive_loss, optimizer='adam')
 
         model_checkpoint_path = f'model_best_Siamese_{fold_no}.keras'
         model_checkpoint_callback = ModelCheckpoint(
@@ -128,7 +131,7 @@ def train_contrastive_model(x, y):
         history = model.fit(
             [pairs_train[:, 0], pairs_train[:, 1]], labels_train,
             validation_data=([pairs_test[:, 0], pairs_test[:, 1]], labels_test),
-            batch_size=128,
+            batch_size=64,
             epochs=200,
             callbacks=[model_checkpoint_callback],
             # class_weight=class_weights_dict
@@ -142,50 +145,38 @@ def train_contrastive_model(x, y):
 
 def evaluate_contrastive_model(x, y, classes):
     """ Evaluate Siamese network on a separate test set """
-    if y.ndim > 1:
-        y_labels = np.argmax(y, axis=1)
-    else:
-        y_labels = y
-
     model_path = 'model_best_Siamese_1.keras'  # Adjust the path as necessary
     model = load_model(model_path, custom_objects={'contrastive_loss': contrastive_loss,
                                                    'EuclideanDistanceLayer': EuclideanDistanceLayer})
 
-    # embeddings = generate_embeddings(model, x)
+    embeddings = generate_embeddings(model, x, 'model')
 
-    pairs_test, labels_test = generate_pairs(x, y_labels)
-    predictions = model.predict([pairs_test[:, 0], pairs_test[:, 1]])
-    y_pred = (predictions < 0.5).astype(int).flatten()
+    # Split data
+    x_train, x_test, y_train, y_test = train_test_split(embeddings, y, test_size=0.2, random_state=42)
 
-    y_true = labels_test
+    # Define classifier model
 
-    # Debugging output
-    print("y_true:", y_true)
-    print("y_pred:", y_pred)
-    i, j = 0, 0
-    for k in range(56000):
-        if y_true[k] == y_pred[k]:
-            i += 1
-        if y_pred[k] == 0:
-            j += 1
-    print("i:", i / 560, j)
-
-
-# plot_confusion_matrix(y_true, y_pred, classes)
+    # Train classifier
+    input_shape = (embeddings.shape[1],)
+    num_classes = y.shape[1]
+    model_checkpoint_path = 'model_best_contrastive_1.keras'
+    model_checkpoint_callback = callbacks.ModelCheckpoint(
+        filepath=model_checkpoint_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
+    classifier_model = create_classifier_model(input_shape, num_classes)
+    classifier_model.summary()
+    history = classifier_model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=200, batch_size=32,
+                                   callbacks=[model_checkpoint_callback])
 
 
 def main():
-    model_path = 'model_best_Siamese_1.keras'  # Adjust the path as necessary
-    model = load_model(model_path, custom_objects={'contrastive_loss': contrastive_loss,
-                                                   'EuclideanDistanceLayer': EuclideanDistanceLayer})
-    model.summary()
     x, y, classes = load_data()
-    # histories = train_models(x, y)
-    histories = train_contrastive_model(x, y)
+    histories = train_models(x, y)
+    # histories = train_contrastive_model(x, y)
 
     # for history in histories:
     #     plot_history(history)
     # evaluate_contrastive_model(x, y, classes)
+    # evaluate_combined_contrastive_model(x, y, classes)
 
 
 if __name__ == '__main__':

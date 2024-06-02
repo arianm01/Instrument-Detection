@@ -9,22 +9,29 @@ from tqdm import tqdm
 
 
 def slice_audio():
-    for file in files:
-        audio = AudioSegment.from_file(audio_path + '/' + file)
-        # Define the length of each segment in milliseconds
-        # Calculate the number of segments
-        num_segments = len(audio) // segment_length_ms
+    classes = os.listdir(audio_path)
+    print(classes)
 
-        # Split the audio and save each segment
-        for i in range(num_segments):
-            start_ms = i * segment_length_ms
-            end_ms = start_ms + segment_length_ms
-            segment = audio[start_ms:end_ms]
-            segment_filename = f"{file}_{i + 1}.mp3"
-            segment_path = os.path.join(output_dir, segment_filename)
-            segment.export(segment_path, format="mp3")
+    for instrument in classes:
+        print(instrument)
+        if not os.path.exists(output_dir + '/' + instrument):
+            os.makedirs(output_dir + '/' + instrument)
+        files = os.listdir(os.path.join(audio_path, instrument))
+        for file in files:
+            audio = AudioSegment.from_file(os.path.join(audio_path, instrument) + '/' + file)
+            # Define the length of each segment in milliseconds
+            # Calculate the number of segments
+            num_segments = len(audio) // segment_length_ms
 
-        print(f"Audio file split into {num_segments} segments and saved to '{output_dir}' directory.")
+            # Split the audio and save each segment
+            for i in range(num_segments):
+                start_ms = i * segment_length_ms
+                end_ms = start_ms + segment_length_ms
+                segment = audio[start_ms:end_ms]
+                segment_filename = f"{output_dir}/{instrument}/{file}_{i + 1}.mp3"
+                segment.export(segment_filename, format="mp3")
+
+            print(f"Audio file split into {num_segments} segments and saved to '{output_dir}' directory.")
 
 
 def clean_audio(audio_files):
@@ -51,11 +58,12 @@ def clean_audio(audio_files):
 
 
 # Load the audio file
-audio_path = "audio_segments_test/test"
+audio_path = ("../../../../archive/Persian Classical Music Instrument Recognition (PCMIR) Database/Persian Classical "
+              "Music Instrument Recognition (PCMIR) Database/")
 files = os.listdir(audio_path)
 segment_length_ms = 1000  # 5 seconds
 # Create a directory for the audio segments if it doesn't already exist
-output_dir = "audio_segments_test/output"
+output_dir = "audio_segments_test"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 

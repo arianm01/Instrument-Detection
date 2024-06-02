@@ -31,18 +31,9 @@ def reshape_data(data, time_steps):
     return np.reshape(data[:, :num_frames, :, :], new_shape)
 
 
-import numpy as np
-import librosa
-
-
-def time_stretch(data, rate=1.0):
-    stretched_data = librosa.effects.time_stretch(data.T, rate=rate).T
-    return stretched_data if stretched_data.shape == data.shape else data
-
-
 def pitch_shift(data, sr, n_steps):
     shifted_data = librosa.effects.pitch_shift(data.T,sr=sr, n_steps=n_steps).T
-    return shifted_data if shifted_data.shape == data.shape else data
+    return shifted_data
 
 
 def add_noise(data, noise_factor=0.005):
@@ -71,11 +62,9 @@ def augment_data(data, sr, label, target_count):
         sample = data[sample_idx]
 
         # Choose an augmentation
-        aug_type = np.random.choice(['time_stretch', 'pitch_shift', 'add_noise', 'time_shift', 'change_volume'])
+        aug_type = np.random.choice(['pitch_shift', 'add_noise', 'time_shift', 'change_volume'])
 
-        if aug_type == 'time_stretch':
-            augmented_sample = time_stretch(sample, rate=np.random.uniform(0.8, 1.2))
-        elif aug_type == 'pitch_shift':
+        if aug_type == 'pitch_shift':
             augmented_sample = pitch_shift(sample, sr, n_steps=np.random.randint(-5, 5))
         elif aug_type == 'add_noise':
             augmented_sample = add_noise(sample, noise_factor=0.005)

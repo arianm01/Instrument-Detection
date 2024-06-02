@@ -8,30 +8,17 @@ from pydub import AudioSegment
 from sklearn.metrics import confusion_matrix, f1_score
 from tensorflow.keras.models import load_model
 
-from utility.InstrumentDataset import plot_confusion_matrix
+from Models.Instrument.ContrastiveLearning import generate_embeddings, contrastive_loss
+from utility.EuclideanDistanceLayer import EuclideanDistanceLayer
+from utility.InstrumentDataset import plot_confusion_matrix, compute_mfcc
 
-label_mapping = {0: 14, 1: 6, 2: 11, 3: 12, 4: 7}
-
-
-def get_mask(y, sample_rate):
-    mask = []
-    y = pd.Series(y).apply(np.abs)
-    y_mean = y.rolling(window=int(sample_rate / 10),
-                       min_periods=1,
-                       center=True).mean()
-    for mean in y_mean:
-        if mean > 0.001:
-            mask.append(True)
-        else:
-            mask.append(False)
-    return mask
+# label_mapping = {0: 4, 1: 0, 2: 2, 3: 3, 4: 1}
 
 
-def preprocess_audio(audio_path, segment_duration=2, n_mfcc=13):
+def preprocess_audio(audio_path, segment_duration=5, n_mfcc=13):
     try:
         signal, sample_rate = librosa.load(audio_path, sr=16000)
         samples_per_segment = int(sample_rate * segment_duration)
-        signal = signal[get_mask(signal, sample_rate)]
         num_segments = int(np.ceil(len(signal) / samples_per_segment))
         segments = []
 
@@ -40,12 +27,17 @@ def preprocess_audio(audio_path, segment_duration=2, n_mfcc=13):
             end_sample = start_sample + samples_per_segment
             if end_sample <= len(signal):
                 segment_signal = signal[start_sample:end_sample]
-                mfcc = librosa.feature.mfcc(y=segment_signal, sr=sample_rate, n_fft=512, hop_length=512, n_mfcc=n_mfcc)
-                segments.append(mfcc.T)
+                mfcc = compute_mfcc(segment_signal, sample_rate, n_mfcc, 512, 512)
+                segments.append(mfcc)
         return np.array(segments)
     except Exception as e:
         print(f"Error processing {audio_path}: {str(e)}")
         return np.array([])
+
+
+def predict_contrastive(segments):
+    embeddings = generate_embeddings(model_base, segments, 'model')
+    return model.predict(embeddings)
 
 
 def predict(audio_path, model):
@@ -54,7 +46,10 @@ def predict(audio_path, model):
         return np.array([])
     segments = segments[..., np.newaxis]
     try:
-        predictions = model.predict(segments)
+        if contrastive:
+            predictions = predict_contrastive(segments)
+        else:
+            predictions = model.predict(segments)
         return np.argmax(predictions, axis=1)
     except Exception as e:
         print(f"Error during prediction for {audio_path}: {str(e)}")
@@ -63,28 +58,34 @@ def predict(audio_path, model):
 
 audio_path = '../../../../archive/NavaDataset'
 try:
-    with open(audio_path + '/test.txt', 'r') as file:
+    with open(audio_path + '/dev.txt', 'r') as file:
         files = [line.strip() for line in file.readlines()]
 except FileNotFoundError:
     print("File not found.")
     files = []
 
-classes = os.listdir('../../Dataset')
+# classes = os.listdir('../../Dataset')
+classes = ['Tar', 'Kamancheh', 'Santur', 'Setar', 'Ney']
 true_labels = []
 predicted_labels = []
 
 
-def extract_label(file_name):
-    try:
-        return label_mapping[int(file_name[0])]
-    except (IndexError, ValueError, KeyError):
-        return None
+# def extract_label(file_name):
+#     try:
+#         return label_mapping[int(file_name[0])]
+#     except (IndexError, ValueError, KeyError):
+#         return None
 
 
 model = load_model('../../model_best_CNN_1.h5')
+model_base = load_model('../../model_best_Siamese_1.keras',
+                        custom_objects={'contrastive_loss': contrastive_loss,
+                                        'EuclideanDistanceLayer': EuclideanDistanceLayer})
+contrastive = False
 
 for file in files:
-    true_label = extract_label(file)
+    # true_label = extract_label(file)
+    true_label = file[0]
     predicted_label = predict(audio_path + '/Data/' + file + '.mp3', model)
     true_labels.extend([true_label] * len(predicted_label))
     predicted_labels.extend(predicted_label)
@@ -97,7 +98,8 @@ for file in files:
         print(f"No predictions for {file}.")
 
 # plot_confusion_matrix(true_labels, predicted_labels, list(label_mapping.values()))
-conf_matrix = confusion_matrix(true_labels, predicted_labels, labels=list(label_mapping.values()))
+print(true_labels, predicted_labels)
+conf_matrix = confusion_matrix(true_labels, predicted_labels)
 print('Confusion matrix', conf_matrix)
 class_accuracies = {}
 total_true_positives, total_predict = 0, 0
@@ -110,7 +112,7 @@ for i, class_label in enumerate(label_mapping.values()):
         accuracy = true_positives / total_predictions
     else:
         accuracy = 0  # To handle division by zero if there are no predictions for this class
-    class_accuracies[class_label] = accuracy
+    class_accuracies[i] = accuracy
 
 # Print accuracy for each class
 for label, acc in class_accuracies.items():
@@ -119,7 +121,7 @@ for label, acc in class_accuracies.items():
 accuracy = total_true_positives / total_predict
 print(f"Total Accuracy {total_true_positives}, {total_predict}: {accuracy * 100}")
 
-f1_scores = f1_score(true_labels, predicted_labels, labels=list(label_mapping.values()), average=None)
+f1_scores = f1_score(true_labels, predicted_labels, average=None)
 macro_f1_score = f1_score(true_labels, predicted_labels, average='weighted')
 
 # Print F1 score for each class
