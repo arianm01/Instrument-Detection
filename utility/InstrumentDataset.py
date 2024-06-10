@@ -5,6 +5,7 @@ import pandas as pd
 from imblearn.combine import SMOTEENN
 from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix
+from sklearn.utils import resample
 from tqdm import tqdm
 
 import librosa
@@ -42,57 +43,134 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=13, n_fft=512, hop_
             - classes (list): List of class names.
     """
     x, y = [], []
+    sample_rate = 16000
     classes = ['Tar', 'Kamancheh', 'Santur', 'Setar', 'Ney']
     print(classes)
-
-    for instrument in classes:
+    for i, instrument in enumerate(classes):
         print(instrument)
         files = os.listdir(os.path.join(dataset_path, str(instrument)))
-        process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y)
+        process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y, i,
+                      merge_factor * sample_rate, 2 * sample_rate)
 
-    print(len(x), len(y))
-    label_to_index, _ = create_label_mapping(y)
-    y = convert_labels_to_indices(y, label_to_index)
+    y = np.array(y)
 
     target_count = max(np.bincount(y))  # Adjust target count as needed
     print(target_count)
-    x, y = balance_dataset_with_augmentation(np.array(x), y, 16000, target_count)
+    # x, y = balance_dataset_with_augmentation(np.array(x), y, 16000, target_count)
     y = np.array(pd.get_dummies(y))
 
     print(x[0], len(y))
     return x, y, classes
 
 
-def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y):
-    baseSignal, seg, last_file = None, 1, ''
+# def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y, label):
+#     baseSignal, seg, last_file = None, 1, ''
+#     for i, file in enumerate(tqdm(files)):
+#         file_path = os.path.join(dataset_path, instrument, file)
+#         signal, sample_rate = librosa.load(file_path, duration=duration, sr=16000)
+#
+#         if i == 12000:
+#             break
+#
+#         if not contains(file, last_file[:-9]):
+#             baseSignal, seg = None, 1
+#
+#         if seg % merge_factor != 0:
+#             baseSignal = concatenate_signals(baseSignal, signal)
+#             last_file, seg = file, seg + 1
+#             continue
+#
+#         baseSignal = concatenate_signals(baseSignal, signal)
+#         last_file = file
+#
+#         mfcc = compute_mfcc(baseSignal, sample_rate, n_mfcc, n_fft, hop_length)
+#         x.append(mfcc)
+#         y.append(label)
+#         baseSignal, seg = None, 1
+#
+#
+# def concatenate_signals(baseSignal, signal):
+#     if baseSignal is not None:
+#         return np.concatenate([baseSignal, signal], axis=0)
+#     return signal
+
+def separate_and_balance_data(X, y, instruments):
+    """Separate and balance data for each instrument."""
+    instrument_data = {}
+    if y.ndim > 1:
+        y_labels = np.argmax(y, axis=1)
+    else:
+        y_labels = y
+
+    for y_label in np.unique(y_labels):
+        # Binary labels: 1 for the instrument, 0 for others
+        y_binary = (y_labels == y_label).astype(int)
+
+        # Separate the positive and negative classes
+        X_pos = X[y_binary == 1]
+        X_neg = X[y_binary == 0]
+        y_pos = y_binary[y_binary == 1]
+        y_neg = y_binary[y_binary == 0]
+
+        # Undersample the negative class
+        X_neg_resampled, y_neg_resampled = resample(X_neg, y_neg, replace=False, n_samples=len(X_pos), random_state=42)
+
+        # Combine the resampled negative class with the positive class
+        X_balanced = np.vstack((X_pos, X_neg_resampled))
+        y_balanced = np.hstack((y_pos, y_neg_resampled))
+
+        instrument_data[instruments[y_label]] = (X_balanced, y_balanced)
+
+    return instrument_data
+
+
+def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y, label,
+                  window_size, step_size):
+    base_signal, seg, last_file = [], 1, ''
+
     for i, file in enumerate(tqdm(files)):
         file_path = os.path.join(dataset_path, instrument, file)
         signal, sample_rate = librosa.load(file_path, duration=duration, sr=16000)
 
-        if i == 12600:
-            break
+        # if i == 12000:
+        #     break
 
         if not contains(file, last_file[:-9]):
-            baseSignal, seg = None, 1
+            # Process the accumulated base_signal
+            if base_signal:
+                base_signal = np.concatenate(base_signal)
+                process_base_signal(base_signal, sample_rate, merge_factor, window_size, step_size, n_mfcc, n_fft,
+                                    hop_length, x, y, label)
+            base_signal, seg = [], 1
 
-        if seg % merge_factor != 0:
-            baseSignal = concatenate_signals(baseSignal, signal)
-            last_file, seg = file, seg + 1
-            continue
-
-        baseSignal = concatenate_signals(baseSignal, signal)
+        base_signal.append(signal)
         last_file = file
+        seg += 1
 
-        mfcc = compute_mfcc(baseSignal, sample_rate, n_mfcc, n_fft, hop_length)
+    # Process the remaining signals after the loop
+    if base_signal:
+        base_signal = np.concatenate(base_signal)
+        process_base_signal(base_signal, step_size, merge_factor, window_size, step_size, n_mfcc, n_fft, hop_length,
+                            x, y, label)
+
+
+def process_base_signal(signal, sample_rate, merge_factor, window_size, step_size, n_mfcc, n_fft, hop_length, x, y,
+                        label):
+    # Create sliding windows with the specified merge_factor
+    windows = create_sliding_windows(signal, window_size, step_size)
+
+    for i, window in enumerate(windows):
+        mfcc = compute_mfcc(window, sample_rate, n_mfcc, n_fft, hop_length)
         x.append(mfcc)
-        y.append(instrument)
-        baseSignal, seg = None, 1
+        y.append(label)
 
 
-def concatenate_signals(baseSignal, signal):
-    if baseSignal is not None:
-        return np.concatenate([baseSignal, signal], axis=0)
-    return signal
+def create_sliding_windows(signal, window_size, step_size):
+    windows = []
+    for start in range(0, len(signal) - window_size + 1, step_size):
+        window = signal[start:start + window_size]
+        windows.append(window)
+    return windows
 
 
 def compute_mfcc(signal, sample_rate, n_mfcc, n_fft, hop_length):

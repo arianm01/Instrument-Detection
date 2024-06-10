@@ -32,7 +32,7 @@ def reshape_data(data, time_steps):
 
 
 def pitch_shift(data, sr, n_steps):
-    shifted_data = librosa.effects.pitch_shift(data.T,sr=sr, n_steps=n_steps).T
+    shifted_data = librosa.effects.pitch_shift(data.T, sr=sr, n_steps=n_steps).T
     return shifted_data
 
 
@@ -114,8 +114,14 @@ def create_label_mapping(labels):
     unique_labels = np.unique(labels)
     label_to_index = {label: index for index, label in enumerate(unique_labels)}
     index_to_label = {index: label for label, index in label_to_index.items()}
+    print(label_to_index, index_to_label)
     return label_to_index, index_to_label
 
 
 def convert_labels_to_indices(labels, label_to_index):
     return np.array([label_to_index[label] for label in labels])
+
+
+def sanitize_file_name(file_name):
+    """Sanitize the file name to avoid invalid characters."""
+    return "".join([c if c.isalnum() or c in (' ', '.', '_') else '_' for c in file_name])

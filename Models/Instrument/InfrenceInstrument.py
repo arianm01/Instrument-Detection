@@ -6,13 +6,16 @@ from collections import Counter
 import pandas as pd
 from pydub import AudioSegment
 from sklearn.metrics import confusion_matrix, f1_score
+from tcn import TCN
 from tensorflow.keras.models import load_model
 
 from Models.Instrument.ContrastiveLearning import generate_embeddings, contrastive_loss
+from Models.TransformerModel import PositionalEncoding, TransformerBlock, MultiHeadSelfAttention
+from main import get_model_feature
 from utility.EuclideanDistanceLayer import EuclideanDistanceLayer
 from utility.InstrumentDataset import plot_confusion_matrix, compute_mfcc
 
-# label_mapping = {0: 4, 1: 0, 2: 2, 3: 3, 4: 1}
+label_mapping = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4}
 
 
 def preprocess_audio(audio_path, segment_duration=5, n_mfcc=13):
@@ -49,7 +52,8 @@ def predict(audio_path, model):
         if contrastive:
             predictions = predict_contrastive(segments)
         else:
-            predictions = model.predict(segments)
+            meta = get_model_feature(segments, models)
+            predictions = model.predict(meta)
         return np.argmax(predictions, axis=1)
     except Exception as e:
         print(f"Error during prediction for {audio_path}: {str(e)}")
@@ -70,21 +74,36 @@ true_labels = []
 predicted_labels = []
 
 
-# def extract_label(file_name):
-#     try:
-#         return label_mapping[int(file_name[0])]
-#     except (IndexError, ValueError, KeyError):
-#         return None
+def extract_label(file_name):
+    try:
+        return label_mapping[int(file_name[0])]
+    except (IndexError, ValueError, KeyError):
+        return None
 
 
-model = load_model('../../model_best_CNN_1.h5')
-model_base = load_model('../../model_best_Siamese_1.keras',
-                        custom_objects={'contrastive_loss': contrastive_loss,
-                                        'EuclideanDistanceLayer': EuclideanDistanceLayer})
+# model = load_model('../../tcn_model.h5', custom_objects={'TCN': TCN})
+# model = load_model('../../transformer.keras',
+#                    custom_objects={'PositionalEncoding': PositionalEncoding, 'TransformerBlock': TransformerBlock,
+#                                    'MultiHeadSelfAttention': MultiHeadSelfAttention})
+# model_base = load_model('../../model_best_Siamese_1.keras',
+#                         custom_objects={'contrastive_loss': contrastive_loss,
+#                                         'EuclideanDistanceLayer': EuclideanDistanceLayer})
+model = load_model('../../ensemble.keras')
+model_paths = ['../../model_best_CNN_1.h5', '../../tcn_model.h5', '../../transformer.keras',
+               '../../model_best_CNN_4.h5',
+               '../../model_best_CNN_5.h5']
+model1 = load_model(model_paths[0])
+model2 = load_model(model_paths[1], custom_objects={'TCN': TCN})
+model3 = load_model(model_paths[2], custom_objects={'PositionalEncoding': PositionalEncoding,
+                                                    'TransformerBlock': TransformerBlock,
+                                                    'MultiHeadSelfAttention': MultiHeadSelfAttention})
+model4 = load_model(model_paths[3])
+model5 = load_model(model_paths[4])
+models = [model1, model2, model3, model4, model5]
 contrastive = False
 
 for file in files:
-    # true_label = extract_label(file)
+    true_label = extract_label(file)
     true_label = file[0]
     predicted_label = predict(audio_path + '/Data/' + file + '.mp3', model)
     true_labels.extend([true_label] * len(predicted_label))
@@ -98,6 +117,7 @@ for file in files:
         print(f"No predictions for {file}.")
 
 # plot_confusion_matrix(true_labels, predicted_labels, list(label_mapping.values()))
+true_labels = [int(x) for x in true_labels]
 print(true_labels, predicted_labels)
 conf_matrix = confusion_matrix(true_labels, predicted_labels)
 print('Confusion matrix', conf_matrix)
