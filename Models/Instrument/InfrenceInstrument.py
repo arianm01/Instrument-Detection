@@ -2,18 +2,25 @@ import os
 import librosa
 import numpy as np
 from collections import Counter
+
+import pandas as pd
 from pydub import AudioSegment
 from sklearn.metrics import confusion_matrix, f1_score
+from tcn import TCN
 from tensorflow.keras.models import load_model
 
-from utility.InstrumentDataset import plot_confusion_matrix
+from Models.Instrument.ContrastiveLearning import generate_embeddings, contrastive_loss
+from Models.TransformerModel import PositionalEncoding, TransformerBlock, MultiHeadSelfAttention
+from main import get_model_feature
+from utility.EuclideanDistanceLayer import EuclideanDistanceLayer
+from utility.InstrumentDataset import plot_confusion_matrix, compute_mfcc
 
-label_mapping = {0: 14, 1: 6, 2: 11, 3: 12, 4: 7}
+label_mapping = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4}
 
 
-def preprocess_audio(audio_path, segment_duration=15, n_mfcc=13):
+def preprocess_audio(audio_path, segment_duration=5, n_mfcc=13):
     try:
-        signal, sample_rate = librosa.load(audio_path)
+        signal, sample_rate = librosa.load(audio_path, sr=16000)
         samples_per_segment = int(sample_rate * segment_duration)
         num_segments = int(np.ceil(len(signal) / samples_per_segment))
         segments = []
@@ -23,12 +30,17 @@ def preprocess_audio(audio_path, segment_duration=15, n_mfcc=13):
             end_sample = start_sample + samples_per_segment
             if end_sample <= len(signal):
                 segment_signal = signal[start_sample:end_sample]
-                mfcc = librosa.feature.mfcc(y=segment_signal, sr=sample_rate, n_fft=2048, hop_length=512, n_mfcc=n_mfcc)
-                segments.append(mfcc.T)
+                mfcc = compute_mfcc(segment_signal, sample_rate, n_mfcc, 512, 512)
+                segments.append(mfcc)
         return np.array(segments)
     except Exception as e:
         print(f"Error processing {audio_path}: {str(e)}")
         return np.array([])
+
+
+def predict_contrastive(segments):
+    embeddings = generate_embeddings(model_base, segments, 'model')
+    return model.predict(embeddings)
 
 
 def predict(audio_path, model):
@@ -37,7 +49,12 @@ def predict(audio_path, model):
         return np.array([])
     segments = segments[..., np.newaxis]
     try:
-        predictions = model.predict(segments)
+        if contrastive:
+            predictions = predict_contrastive(segments)
+        else:
+            # meta = get_model_feature(segments, models)
+            # predictions = model.predict(meta)
+            predictions = model.predict(segments)
         return np.argmax(predictions, axis=1)
     except Exception as e:
         print(f"Error during prediction for {audio_path}: {str(e)}")
@@ -46,13 +63,14 @@ def predict(audio_path, model):
 
 audio_path = '../../../../archive/NavaDataset'
 try:
-    with open(audio_path + '/test.txt', 'r') as file:
+    with open(audio_path + '/dev.txt', 'r') as file:
         files = [line.strip() for line in file.readlines()]
 except FileNotFoundError:
     print("File not found.")
     files = []
 
-classes = os.listdir('../../input')
+# classes = os.listdir('../../Dataset')
+classes = ['Tar', 'Kamancheh', 'Santur', 'Setar', 'Ney']
 true_labels = []
 predicted_labels = []
 
@@ -64,11 +82,33 @@ def extract_label(file_name):
         return None
 
 
-model = load_model('../../model_best_CNN_3.h5')
+# model = load_model('../../tcn_model.h5', custom_objects={'TCN': TCN})
+# model = load_model('../../transformer.keras',
+#                    custom_objects={'PositionalEncoding': PositionalEncoding, 'TransformerBlock': TransformerBlock,
+#                                    'MultiHeadSelfAttention': MultiHeadSelfAttention})
+# model_base = load_model('../../model_best_Siamese_1.keras',
+#                         custom_objects={'contrastive_loss': contrastive_loss,
+#                                         'EuclideanDistanceLayer': EuclideanDistanceLayer})
+# model = load_model('../../ensemble.keras')
+model_paths = ['../../Models/model_best_Tar.h5', '../../Models/model_best_Kamancheh.h5',
+               '../../Models/model_best_Santur.h5',
+               '../../Models/model_best_Setar.h5',
+               '../../Models/model_best_Ney.h5']
+model1 = load_model(model_paths[0])
+model2 = load_model(model_paths[1], custom_objects={'TCN': TCN})
+model3 = load_model(model_paths[2], custom_objects={'PositionalEncoding': PositionalEncoding,
+                                                    'TransformerBlock': TransformerBlock,
+                                                    'MultiHeadSelfAttention': MultiHeadSelfAttention})
+model4 = load_model(model_paths[3])
+model5 = load_model(model_paths[4])
+models = [model1, model2, model3, model4, model5]
+contrastive = False
+modelNew = load_model('../../model_best_CNN_2.h5')
 
 for file in files:
     true_label = extract_label(file)
-    predicted_label = predict(audio_path + '/Data/' + file + '.mp3', model)
+    true_label = file[0]
+    predicted_label = predict(audio_path + '/Data/' + file + '.mp3', modelNew)
     true_labels.extend([true_label] * len(predicted_label))
     predicted_labels.extend(predicted_label)
     if predicted_label.size > 0:
@@ -80,8 +120,10 @@ for file in files:
         print(f"No predictions for {file}.")
 
 # plot_confusion_matrix(true_labels, predicted_labels, list(label_mapping.values()))
-conf_matrix = confusion_matrix(true_labels, predicted_labels, labels=list(label_mapping.values()))
-print(f"Confusion matrix", conf_matrix)
+true_labels = [int(x) for x in true_labels]
+print(true_labels, predicted_labels)
+conf_matrix = confusion_matrix(true_labels, predicted_labels)
+print('Confusion matrix', conf_matrix)
 class_accuracies = {}
 total_true_positives, total_predict = 0, 0
 for i, class_label in enumerate(label_mapping.values()):
@@ -93,17 +135,16 @@ for i, class_label in enumerate(label_mapping.values()):
         accuracy = true_positives / total_predictions
     else:
         accuracy = 0  # To handle division by zero if there are no predictions for this class
-    class_accuracies[class_label] = accuracy
+    class_accuracies[i] = accuracy
 
 # Print accuracy for each class
 for label, acc in class_accuracies.items():
-    print(f"Accuracy for class {label}: {acc:.2f}")
+    print(f"Accuracy for class {label}: {acc * 100:.2f}")
 
 accuracy = total_true_positives / total_predict
-print(f"Total Accuracy {total_true_positives}, {total_predict}: {accuracy}")
+print(f"Total Accuracy {total_true_positives}, {total_predict}: {accuracy * 100}")
 
-
-f1_scores = f1_score(true_labels, predicted_labels, labels=list(label_mapping.values()), average=None)
+f1_scores = f1_score(true_labels, predicted_labels, average=None)
 macro_f1_score = f1_score(true_labels, predicted_labels, average='weighted')
 
 # Print F1 score for each class

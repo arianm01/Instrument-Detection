@@ -47,7 +47,7 @@ def tune_models(x, y):
 
     for fold_no, (train_index, test_index) in enumerate(skf.split(x, y_labels), start=1):
         print(fold_no, (train_index, test_index))
-        X_train, X_test = x[train_index], x[test_index]
+        x_train, x_test = x[train_index], x[test_index]
         y_train, y_test = y[train_index], y[test_index]
 
         model_checkpoint_path = f'model_best_CNN_{fold_no}.h5'
@@ -57,9 +57,9 @@ def tune_models(x, y):
 
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
-        print(X_train.shape, y_train.shape)
+        print(x_train.shape, y_train.shape)
 
-        history = model.fit(X_train, y_train, validation_data=(X_test, y_test),
+        history = model.fit(x_train, y_train, validation_data=(x_test, y_test),
                             batch_size=32, epochs=100, callbacks=[model_checkpoint_callback, lr_scheduler])
         histories.append(history)
         fold_no += 1
@@ -67,8 +67,8 @@ def tune_models(x, y):
 
 
 def main():
-    X, y = load_nava_data()
-    histories = tune_models(X, y)
+    x, y = load_nava_data()
+    histories = tune_models(x, y)
 
     for history in histories:
         plot_history(history)
