@@ -1,9 +1,10 @@
 import numpy as np
 import librosa
 from keras import Input, Model
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.layers import TimeDistributed, Conv2D, BatchNormalization, MaxPooling2D, Dropout, Flatten, LSTM, Dense, \
     Activation
+from keras.optimizers import Adam
 from keras.regularizers import l2, l1, l1_l2
 from keras.saving.save import load_model
 from sklearn.utils import class_weight
@@ -50,10 +51,63 @@ def cnn_model(input_shape, num_classes, layer_sizes, X_train, y_train, X_test, y
     model_checkpoint_callback = callbacks.ModelCheckpoint(
         filepath=model_checkpoint_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
     lr_scheduler = callbacks.LearningRateScheduler(lr_time_based_decay, verbose=1)
+    early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model.fit(X_train, y_train, validation_data=(X_test, y_test),
-                     batch_size=batch_size, epochs=epochs, callbacks=[model_checkpoint_callback, lr_scheduler])
+                     batch_size=batch_size, epochs=epochs,
+                     callbacks=[model_checkpoint_callback, lr_scheduler, early_stopping])
+
+
+def create_advanced_cnn_model(input_shape, num_classes, X_train, y_train, X_test, y_test, instrument):
+    """Create an advanced CNN model for instrument classification."""
+    model = Sequential()
+
+    # Input layer
+    model.add(Input(shape=input_shape))
+
+    # First convolutional block
+    model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', padding='same'))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Dropout(0.25))
+
+    # Second convolutional block
+    model.add(Conv2D(64, kernel_size=(3, 3), activation='relu', padding='same'))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Dropout(0.25))
+
+    # Third convolutional block
+    model.add(Conv2D(128, kernel_size=(3, 3), activation='relu', padding='same'))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Dropout(0.25))
+
+    # Flatten the output and add dense layers
+    model.add(Flatten())
+    model.add(Dense(256, activation='relu'))
+    model.add(BatchNormalization())
+    model.add(Dropout(0.5))
+
+    model.add(Dense(128, activation='relu'))
+    model.add(BatchNormalization())
+    model.add(Dropout(0.5))
+
+    # Output layer
+    model.add(Dense(num_classes, activation='softmax'))
+
+    model_checkpoint_path = f'model_best_CNN_{instrument}.h5'
+
+    model.compile(optimizer=Adam(learning_rate=0.001), loss='categorical_crossentropy', metrics=['accuracy'])
+    model_checkpoint_callback = callbacks.ModelCheckpoint(
+        filepath=model_checkpoint_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
+    early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+
+    model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(X_test, y_test),
+              callbacks=[model_checkpoint_callback, early_stopping])
+
+    return model
 
 
 def cnn_model_binary(input_shape, num_classes, layer_sizes, X_train, y_train, X_test, y_test, instrument, batch_size,
@@ -79,10 +133,12 @@ def cnn_model_binary(input_shape, num_classes, layer_sizes, X_train, y_train, X_
     model_checkpoint_callback = callbacks.ModelCheckpoint(
         filepath=model_checkpoint_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
     lr_scheduler = callbacks.LearningRateScheduler(lr_time_based_decay, verbose=1)
+    early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model.fit(X_train, y_train, validation_data=(X_test, y_test),
-                     batch_size=batch_size, epochs=epochs, callbacks=[model_checkpoint_callback, lr_scheduler])
+                     batch_size=batch_size, epochs=epochs,
+                     callbacks=[model_checkpoint_callback, lr_scheduler, early_stopping])
 
 
 def build_lstm_model(input_shape, num_classes):

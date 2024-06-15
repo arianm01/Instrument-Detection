@@ -52,8 +52,9 @@ def predict(audio_path, model):
         if contrastive:
             predictions = predict_contrastive(segments)
         else:
-            meta = get_model_feature(segments, models)
-            predictions = model.predict(meta)
+            # meta = get_model_feature(segments, models)
+            # predictions = model.predict(meta)
+            predictions = model.predict(segments)
         return np.argmax(predictions, axis=1)
     except Exception as e:
         print(f"Error during prediction for {audio_path}: {str(e)}")
@@ -88,10 +89,11 @@ def extract_label(file_name):
 # model_base = load_model('../../model_best_Siamese_1.keras',
 #                         custom_objects={'contrastive_loss': contrastive_loss,
 #                                         'EuclideanDistanceLayer': EuclideanDistanceLayer})
-model = load_model('../../ensemble.keras')
-model_paths = ['../../model_best_CNN_1.h5', '../../tcn_model.h5', '../../transformer.keras',
-               '../../model_best_CNN_4.h5',
-               '../../model_best_CNN_5.h5']
+# model = load_model('../../ensemble.keras')
+model_paths = ['../../Models/model_best_Tar.h5', '../../Models/model_best_Kamancheh.h5',
+               '../../Models/model_best_Santur.h5',
+               '../../Models/model_best_Setar.h5',
+               '../../Models/model_best_Ney.h5']
 model1 = load_model(model_paths[0])
 model2 = load_model(model_paths[1], custom_objects={'TCN': TCN})
 model3 = load_model(model_paths[2], custom_objects={'PositionalEncoding': PositionalEncoding,
@@ -101,11 +103,12 @@ model4 = load_model(model_paths[3])
 model5 = load_model(model_paths[4])
 models = [model1, model2, model3, model4, model5]
 contrastive = False
+modelNew = load_model('../../model_best_CNN_2.h5')
 
 for file in files:
     true_label = extract_label(file)
     true_label = file[0]
-    predicted_label = predict(audio_path + '/Data/' + file + '.mp3', model)
+    predicted_label = predict(audio_path + '/Data/' + file + '.mp3', modelNew)
     true_labels.extend([true_label] * len(predicted_label))
     predicted_labels.extend(predicted_label)
     if predicted_label.size > 0:

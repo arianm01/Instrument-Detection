@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from imblearn.combine import SMOTEENN
 from matplotlib import pyplot as plt
+import tensorflow as tf
 from sklearn.metrics import confusion_matrix
 from sklearn.utils import resample
 from tqdm import tqdm
@@ -50,7 +51,7 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=13, n_fft=512, hop_
         print(instrument)
         files = os.listdir(os.path.join(dataset_path, str(instrument)))
         process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y, i,
-                      merge_factor * sample_rate, 2 * sample_rate)
+                      5 * merge_factor * sample_rate, int(5 * merge_factor * sample_rate / 2))
 
     y = np.array(y)
 
@@ -62,37 +63,6 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=13, n_fft=512, hop_
     print(x[0], len(y))
     return x, y, classes
 
-
-# def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y, label):
-#     baseSignal, seg, last_file = None, 1, ''
-#     for i, file in enumerate(tqdm(files)):
-#         file_path = os.path.join(dataset_path, instrument, file)
-#         signal, sample_rate = librosa.load(file_path, duration=duration, sr=16000)
-#
-#         if i == 12000:
-#             break
-#
-#         if not contains(file, last_file[:-9]):
-#             baseSignal, seg = None, 1
-#
-#         if seg % merge_factor != 0:
-#             baseSignal = concatenate_signals(baseSignal, signal)
-#             last_file, seg = file, seg + 1
-#             continue
-#
-#         baseSignal = concatenate_signals(baseSignal, signal)
-#         last_file = file
-#
-#         mfcc = compute_mfcc(baseSignal, sample_rate, n_mfcc, n_fft, hop_length)
-#         x.append(mfcc)
-#         y.append(label)
-#         baseSignal, seg = None, 1
-#
-#
-# def concatenate_signals(baseSignal, signal):
-#     if baseSignal is not None:
-#         return np.concatenate([baseSignal, signal], axis=0)
-#     return signal
 
 def separate_and_balance_data(X, y, instruments):
     """Separate and balance data for each instrument."""
@@ -180,12 +150,12 @@ def compute_mfcc(signal, sample_rate, n_mfcc, n_fft, hop_length):
 
 def normalize_mfccs(mfccs):
     # Calculate mean and standard deviation of the MFCCs
-    mean = np.mean(mfccs, axis=0)
-    std = np.std(mfccs, axis=0)
-
-    # Apply Z-score normalization
-    normalized_mfccs = (mfccs - mean) / std
-    return normalized_mfccs
+    # mean = np.mean(mfccs, axis=0)
+    # std = np.std(mfccs, axis=0)
+    #
+    # # Apply Z-score normalization
+    # normalized_mfccs = (mfccs - mean) / std
+    return mfccs
 
 
 def plot_history(history):
@@ -265,3 +235,30 @@ def plot_confusion_matrix(y_true, y_pred, classes, normalize=True, title=None, c
                     ha="center", va="center",
                     color="white" if cm[i, j] > thresh else "black")
     plt.show()
+
+
+def spec_augment(mel_spectrogram, time_warping_para=80, frequency_masking_para=27, time_masking_para=100, num_masks=1):
+    v = mel_spectrogram.shape[0]
+    tau = mel_spectrogram.shape[1]
+
+    warped_mel_spectrogram = tf.identity(mel_spectrogram)
+
+    # Frequency masking
+    for i in range(num_masks):
+        f = tf.random.uniform([], minval=0, maxval=frequency_masking_para, dtype=tf.int32)
+        f0 = tf.random.uniform([], minval=0, maxval=v - f, dtype=tf.int32)
+        warped_mel_spectrogram = tf.concat(
+            (warped_mel_spectrogram[:f0, :], tf.zeros((f, tau)), warped_mel_spectrogram[f0 + f:, :]), axis=0)
+
+    # Time masking
+    for i in range(num_masks):
+        t = tf.random.uniform([], minval=0, maxval=time_masking_para, dtype=tf.int32)
+        t0 = tf.random.uniform([], minval=0, maxval=tau - t, dtype=tf.int32)
+        warped_mel_spectrogram = tf.concat(
+            (warped_mel_spectrogram[:, :t0], tf.zeros((v, t)), warped_mel_spectrogram[:, t0 + t:]), axis=1)
+
+    return warped_mel_spectrogram
+
+
+def apply_spec_augment(X):
+    return np.array([spec_augment(x) for x in X])

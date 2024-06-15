@@ -6,7 +6,7 @@ import librosa
 import matplotlib.pyplot as plt
 from keras import Input, Model
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
-from keras.layers import Lambda
+from keras.layers import Lambda, Dense, Concatenate
 from keras.models import load_model
 from keras.utils import to_categorical
 from keras.utils.version_utils import callbacks
@@ -21,7 +21,7 @@ from tcn import tcn_full_summary, TCN
 from Models.Instrument.ContrastiveLearning import generate_pairs, create_base_network, euclidean_distance, \
     contrastive_loss, generate_embeddings, evaluate_combined_contrastive_model
 from Models.Instrument.Kaggle import cnn_model, custom_model, create_classifier_model, build_tcn_model, \
-    lr_time_based_decay, cnn_model_binary
+    lr_time_based_decay, cnn_model_binary, create_advanced_cnn_model
 from Models.TransformerModel import build_transformer_model, PositionalEncoding, TransformerBlock, \
     MultiHeadSelfAttention
 from utility import InstrumentDataset
@@ -45,7 +45,8 @@ def extract_features(signal, frame_size, hop_length):
 
 def load_data():
     """ Load and preprocess data """
-    x, y, classes = InstrumentDataset.read_data('./Models/Instrument/audio_segments_test/output', 5, duration=1)
+    # x, y, classes = InstrumentDataset.read_data('./Models/Instrument/audio_segments_test/output', 5, duration=1)
+    x, y, classes = InstrumentDataset.read_data('./Dataset', 1, duration=5)
     print(np.array(x).shape)
     X = np.array(x)[..., np.newaxis]  # Add an extra dimension for the channels
     print(f'The shape of X is {X.shape}')
@@ -75,7 +76,8 @@ def train_models(x, y):
         num_classes = y_train.shape[1]
         layer_sizes = [256, 128, 64, 32]
         # history = custom_model(input_shape, num_classes, fold_no, X_train, y_train, X_test, y_test)
-        history = cnn_model(input_shape, num_classes, layer_sizes, x_train, y_train, x_test, y_test, fold_no, 128, 100)
+        # history = cnn_model(input_shape, num_classes, layer_sizes, x_train, y_train, x_test, y_test, fold_no, 128, 100)
+        history = create_advanced_cnn_model(input_shape, num_classes, x_train, y_train, x_test, y_test, fold_no)
         # history = TCN(num_classes, x_test, x_train, y_test, y_train)
         # history = transformer(input_shape, num_classes, x_test, x_train, y_test, y_train)
         histories.append(history)
@@ -135,15 +137,27 @@ def get_meta_features(models, X):
     return meta_features
 
 
-def train_meta_model(X_train, y_train, x_test, y_test):
+def train_meta_model(X_train, y_train, x_test, y_test, models):
     """Train meta-model using meta-features."""
-    input_shape = X_train.shape[1]
-    meta_model = create_classifier_model(input_shape, 5, [16, 8])
+    input_shape = X_train.shape[1:]
+    _input = Input(input_shape)
+    bases = [model(_input) for model in models]
+
+    concat = Concatenate()(bases)
+    hidden_layer = Dense(units=64, activation='relu')(concat)
+    hidden_layer2 = Dense(units=32, activation='relu')(hidden_layer)
+    output_layer = Dense(units=5, activation='softmax')(hidden_layer2)
+
+    model = Model(inputs=_input, outputs=output_layer)
+
+    # meta_model = create_classifier_model(input_shape, 5, [16, 8])
     model_checkpoint_callback = callbacks.ModelCheckpoint(
         filepath='ensemble.keras', save_best_only=True, monitor='val_loss', mode='min', verbose=1)
-    meta_model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(x_test, y_test),
-                   callbacks=[model_checkpoint_callback])
-    return meta_model
+    model.compile(loss=contrastive_loss, optimizer='adam')
+    model.summary()
+    model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(x_test, y_test),
+              callbacks=[model_checkpoint_callback])
+    return model
 
 
 def train_models_by_instrument(X, y, instruments, save_dir="models"):
@@ -170,7 +184,7 @@ def train_models_by_instrument(X, y, instruments, save_dir="models"):
         model_file_path = os.path.join(save_dir, model_file_name)
         input_shape = (x_train.shape[1], x_train.shape[2], 1)
         num_classes = 1
-        layer_sizes = [128, 64, 32]
+        layer_sizes = [128, 64]
         print(f"Training model for instrument: {instrument}")
         history = cnn_model_binary(input_shape, num_classes, layer_sizes, X_inst, y_inst, x_test, y_test,
                                    instrument, 128, 50, model_file_path)
@@ -179,25 +193,27 @@ def train_models_by_instrument(X, y, instruments, save_dir="models"):
 
 
 def ensemble_learning(x, y, instruments):
-    meta_features = get_model_feature(x)
+    # meta_features = get_model_feature(x)
     # instrument_models = train_models_by_instrument(x, y, instruments)
 
     # y_meta_train = np.argmax(y, axis=1)
-    # X_train, X_val, y_train, y_val = train_test_split(meta_features, y, test_size=0.2, random_state=42)
+    X_train, X_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
 
-    # meta_model = train_meta_model(X_train, y_train, X_val, y_val)
+    models = [load_model('./model_best_CNN_1.h5'), load_model('./model_best_CNN_2.h5'),
+              load_model('./model_best_CNN_3.h5'), load_model('./model_best_CNN_4.h5'),
+              load_model('./model_best_CNN_5.h5'), ]
+    meta_model = train_meta_model(X_train, y_train, X_val, y_val, models)
 
 
 def get_model_feature(x, models=None):
     if models is None:
-        model_paths = ['./model_best_CNN_1.h5', './tcn_model.h5', './transformer.keras', './model_best_CNN_4.h5',
-                       './model_best_CNN_5.h5']
+        model_paths = ['./Models/model_best_Tar.h5', './Models/model_best_Kamancheh.h5',
+                       './Models/model_best_Santur.h5', './Models/model_best_Setar.h5',
+                       './Models/model_best_Ney.h5']
         print(models)
         model1 = load_model(model_paths[0])
-        model2 = load_model(model_paths[1], custom_objects={'TCN': TCN})
-        model3 = load_model(model_paths[2], custom_objects={'PositionalEncoding': PositionalEncoding,
-                                                            'TransformerBlock': TransformerBlock,
-                                                            'MultiHeadSelfAttention': MultiHeadSelfAttention})
+        model2 = load_model(model_paths[1])
+        model3 = load_model(model_paths[2])
         model4 = load_model(model_paths[3])
         model5 = load_model(model_paths[4])
         models = [model1, model2, model3, model4, model5]
