@@ -3,3 +3,9 @@ Test
 .idea
 samples
 Models/Instrument/audio_segments_test
+/output/Instruments.csv
+/output/15 seconds/model_best_CNN_1.h5
+/output/15 seconds/model_best_CNN_2.h5
+/output/15 seconds/model_best_CNN_3.h5
+/output/15 seconds/model_best_CNN_4.h5
+/output/15 seconds/model_best_CNN_5.h5

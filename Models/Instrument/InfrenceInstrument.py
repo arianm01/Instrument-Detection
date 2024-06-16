@@ -20,7 +20,7 @@ label_mapping = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4}
 
 def preprocess_audio(audio_path, segment_duration=5, n_mfcc=13):
     try:
-        signal, sample_rate = librosa.load(audio_path, sr=16000)
+        signal, sample_rate = librosa.load(audio_path)
         samples_per_segment = int(sample_rate * segment_duration)
         num_segments = int(np.ceil(len(signal) / samples_per_segment))
         segments = []

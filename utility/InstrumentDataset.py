@@ -100,7 +100,7 @@ def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfc
 
     for i, file in enumerate(tqdm(files)):
         file_path = os.path.join(dataset_path, instrument, file)
-        signal, sample_rate = librosa.load(file_path, duration=duration, sr=16000)
+        signal, sample_rate = librosa.load(file_path, duration=duration)
 
         # if i == 12000:
         #     break
