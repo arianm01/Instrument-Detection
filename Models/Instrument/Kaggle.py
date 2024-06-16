@@ -18,7 +18,7 @@ from utility.EuclideanDistanceLayer import EuclideanDistanceLayer
 
 # Set constants for the learning rate schedule
 INITIAL_LEARNING_RATE = 0.0001
-DECAY_RATE = 0.0001
+DECAY_RATE = 0.001
 MIN_LEARNING_RATE = 0.00005
 
 
@@ -51,7 +51,7 @@ def cnn_model(input_shape, num_classes, layer_sizes, X_train, y_train, X_test, y
     model_checkpoint_callback = callbacks.ModelCheckpoint(
         filepath=model_checkpoint_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
     lr_scheduler = callbacks.LearningRateScheduler(lr_time_based_decay, verbose=1)
-    early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+    early_stopping = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True)
 
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model.fit(X_train, y_train, validation_data=(X_test, y_test),
@@ -246,7 +246,7 @@ def build_tcn_model(input_shape, num_classes, kernel_size=3, nb_filters=64, dila
             dilations=dilations,
             dropout_rate=dropout_rate,
             return_sequences=False),
-        Dense(256, activation='relu', kernel_regularizer=l1_l2(l1=l1_reg, l2=l2_reg)),
+        Dense(256, activation='relu'),
         Dropout(0.3),
         Dense(num_classes, activation='softmax')
     ])

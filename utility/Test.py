@@ -137,7 +137,7 @@ def represent_data():
         instrument_path = os.path.join(DATASET_PATH, str(instrument))
         file = os.listdir(instrument_path)[0]
         file_path = os.path.join(instrument_path, str(file))
-        signal, sample_rate = librosa.load(file_path, sr=16000)
+        signal, sample_rate = librosa.load(file_path)
         print(sample_rate)
         mask = envelope(signal, sample_rate, 0.0005)
         signal = signal[mask]

@@ -3,3 +3,5 @@ Test
 .idea
 samples
 Models/Instrument/audio_segments_test
+/output
+Models/Instrument/Flute
