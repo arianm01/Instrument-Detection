@@ -29,7 +29,8 @@ from utility.EuclideanDistanceLayer import EuclideanDistanceLayer
 from utility.InstrumentDataset import plot_history, plot_confusion_matrix, separate_and_balance_data
 from utility.utils import test_gpu, reshape_data, sanitize_file_name
 
-TIME_FRAME = 5
+TIME_FRAME = 1
+MERGE_FACTOR = 5
 
 # Initialize GPU configuration
 test_gpu()
@@ -45,8 +46,8 @@ def extract_features(signal, frame_size, hop_length):
 
 def load_data():
     """ Load and preprocess data """
-    # x, y, classes = InstrumentDataset.read_data('./Models/Instrument/audio_segments_test/output', 5, duration=1)
-    x, y, classes = InstrumentDataset.read_data('./Dataset', 1, duration=5)
+    x, y, classes = InstrumentDataset.read_data('./Models/Instrument/audio_segments_test', MERGE_FACTOR, TIME_FRAME)
+    # x, y, classes = InstrumentDataset.read_data('./Dataset', MERGE_FACTOR, TIME_FRAME)
     print(np.array(x).shape)
     X = np.array(x)[..., np.newaxis]  # Add an extra dimension for the channels
     print(f'The shape of X is {X.shape}')
@@ -74,11 +75,11 @@ def train_models(x, y):
         print(f'Training fold {fold_no}...')
         input_shape = (x_train.shape[1], x_train.shape[2], 1)
         num_classes = y_train.shape[1]
-        layer_sizes = [256, 128, 64, 32]
+        layer_sizes = [512, 256, 128, 64]
         # history = custom_model(input_shape, num_classes, fold_no, X_train, y_train, X_test, y_test)
-        # history = cnn_model(input_shape, num_classes, layer_sizes, x_train, y_train, x_test, y_test, fold_no, 128, 100)
-        history = create_advanced_cnn_model(input_shape, num_classes, x_train, y_train, x_test, y_test, fold_no)
-        # history = TCN(num_classes, x_test, x_train, y_test, y_train)
+        history = cnn_model(input_shape, num_classes, layer_sizes, x_train, y_train, x_test, y_test, fold_no, 8, 100)
+        # history = create_advanced_cnn_model(input_shape, num_classes, x_train, y_train, x_test, y_test, fold_no)
+        # history = tcn_model(num_classes, x_test, x_train, y_test, y_train)
         # history = transformer(input_shape, num_classes, x_test, x_train, y_test, y_train)
         histories.append(history)
         fold_no += 1
@@ -96,8 +97,7 @@ def transformer(input_shape, num_classes, x_test, x_train, y_test, y_train):
     model_checkpoint_callback = ModelCheckpoint(filepath='transformer.keras', save_best_only=True, monitor='val_loss',
                                                 mode='min', verbose=1)
     lr_scheduler = LearningRateScheduler(lr_time_based_decay, verbose=1)
-    # Train the TCN model
-    history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=50, batch_size=32,
+    history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=100, batch_size=32,
                         callbacks=[model_checkpoint_callback, lr_scheduler])
     return history
 
@@ -113,7 +113,7 @@ def tcn_model(num_classes, x_test, x_train, y_test, y_train):
                                                 mode='min', verbose=1)
     lr_scheduler = LearningRateScheduler(lr_time_based_decay, verbose=1)
     # Train the TCN model
-    history = tcn_model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=50, batch_size=32,
+    history = tcn_model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=100, batch_size=32,
                             callbacks=[model_checkpoint_callback, lr_scheduler])
     # Save the model
     tcn_model.save('tcn_model.h5')
@@ -130,30 +130,41 @@ def evaluate_models(x, y, classes):
     plot_confusion_matrix(y_true_labels, y_pred_labels, classes)
 
 
+# def get_meta_features(models, X):
+#     """Generate meta-features using predictions from base models."""
+#     meta_features = [model.predict(X) for model in models]
+#     meta_features = np.concatenate(meta_features, axis=1)  # Concatenate predictions as meta-features
+#     return meta_features
+
 def get_meta_features(models, X):
     """Generate meta-features using predictions from base models."""
+    # num_samples = X.shape[0]
+    # segment_length = 216
+    #
+    # first_half = X[:, :segment_length, ...]
+    # second_half = X[:, segment_length:, ...]
+    #
+    # # Predict in batch for both halves
+    # first_half_features = np.concatenate([model.predict(first_half) for model in models], axis=1)
+    # second_half_features = np.concatenate([model.predict(second_half) for model in models], axis=1)
+    #
+    # # Concatenate features from both halves
+    # meta_features = np.concatenate([first_half_features, second_half_features], axis=1)
+
     meta_features = [model.predict(X) for model in models]
     meta_features = np.concatenate(meta_features, axis=1)  # Concatenate predictions as meta-features
+
     return meta_features
 
 
 def train_meta_model(X_train, y_train, x_test, y_test, models):
     """Train meta-model using meta-features."""
-    input_shape = X_train.shape[1:]
-    _input = Input(input_shape)
-    bases = [model(_input) for model in models]
+    input_shape = X_train.shape[1]
 
-    concat = Concatenate()(bases)
-    hidden_layer = Dense(units=64, activation='relu')(concat)
-    hidden_layer2 = Dense(units=32, activation='relu')(hidden_layer)
-    output_layer = Dense(units=5, activation='softmax')(hidden_layer2)
-
-    model = Model(inputs=_input, outputs=output_layer)
-
-    # meta_model = create_classifier_model(input_shape, 5, [16, 8])
+    model = create_classifier_model(input_shape, 5, [64, 32, 16])
     model_checkpoint_callback = callbacks.ModelCheckpoint(
         filepath='ensemble.keras', save_best_only=True, monitor='val_loss', mode='min', verbose=1)
-    model.compile(loss=contrastive_loss, optimizer='adam')
+    model.compile(loss='categorical_crossentropy', optimizer='adam')
     model.summary()
     model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(x_test, y_test),
               callbacks=[model_checkpoint_callback])
@@ -193,15 +204,15 @@ def train_models_by_instrument(X, y, instruments, save_dir="models"):
 
 
 def ensemble_learning(x, y, instruments):
-    # meta_features = get_model_feature(x)
-    # instrument_models = train_models_by_instrument(x, y, instruments)
-
-    # y_meta_train = np.argmax(y, axis=1)
-    X_train, X_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
-
     models = [load_model('./model_best_CNN_1.h5'), load_model('./model_best_CNN_2.h5'),
               load_model('./model_best_CNN_3.h5'), load_model('./model_best_CNN_4.h5'),
               load_model('./model_best_CNN_5.h5'), ]
+    meta_features = get_model_feature(x, models)
+    # instrument_models = train_models_by_instrument(x, y, instruments)
+
+    # y_meta_train = np.argmax(y, axis=1)
+    X_train, X_val, y_train, y_val = train_test_split(meta_features, y, test_size=0.2, random_state=42)
+
     meta_model = train_meta_model(X_train, y_train, X_val, y_val, models)
 
 
@@ -223,9 +234,9 @@ def get_model_feature(x, models=None):
 
 def main():
     x, y, classes = load_data()
-    # histories = train_models(x, y)
+    histories = train_models(x, y)
     # histories = train_contrastive_model(x, y)
-    ensemble_learning(x, y, classes)
+    # ensemble_learning(x, y, classes)
 
     # for history in histories:
     #     plot_history(history)

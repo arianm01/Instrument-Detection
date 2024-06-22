@@ -30,7 +30,7 @@ def preprocess_audio(audio_path, segment_duration=5, n_mfcc=13):
             end_sample = start_sample + samples_per_segment
             if end_sample <= len(signal):
                 segment_signal = signal[start_sample:end_sample]
-                mfcc = compute_mfcc(segment_signal, sample_rate, n_mfcc, 512, 512)
+                mfcc = compute_mfcc(segment_signal, sample_rate, n_mfcc, 2048, 512)
                 segments.append(mfcc)
         return np.array(segments)
     except Exception as e:
@@ -48,22 +48,37 @@ def predict(audio_path, model):
     if segments.size == 0:
         return np.array([])
     segments = segments[..., np.newaxis]
-    try:
-        if contrastive:
-            predictions = predict_contrastive(segments)
-        else:
-            # meta = get_model_feature(segments, models)
-            # predictions = model.predict(meta)
-            predictions = model.predict(segments)
+    num_segments = segments.shape[0]
+    chunk_size = 20
+    if num_segments > chunk_size:
+        predictions = []
+
+        for start in range(0, num_segments, chunk_size):
+            end = min(start + chunk_size, num_segments)
+            segment_chunk = segments[start:end]
+            chunk_predictions = model.predict(segment_chunk)
+            predictions.append(chunk_predictions)
+
+        # Combine the predictions
+        predictions = np.concatenate(predictions, axis=0)
         return np.argmax(predictions, axis=1)
-    except Exception as e:
-        print(f"Error during prediction for {audio_path}: {str(e)}")
-        return np.array([])
+    else:
+        try:
+            if contrastive:
+                predictions = predict_contrastive(segments)
+            else:
+                # meta = get_model_feature(segments, models)
+                # predictions = model.predict(meta)
+                predictions = model.predict(segments)
+            return np.argmax(predictions, axis=1)
+        except Exception as e:
+            print(f"Error during prediction for {audio_path}: {str(e)}")
+            return np.array([])
 
 
 audio_path = '../../../../archive/NavaDataset'
 try:
-    with open(audio_path + '/dev.txt', 'r') as file:
+    with open(audio_path + '/test.txt', 'r') as file:
         files = [line.strip() for line in file.readlines()]
 except FileNotFoundError:
     print("File not found.")
@@ -89,11 +104,9 @@ def extract_label(file_name):
 # model_base = load_model('../../model_best_Siamese_1.keras',
 #                         custom_objects={'contrastive_loss': contrastive_loss,
 #                                         'EuclideanDistanceLayer': EuclideanDistanceLayer})
-# model = load_model('../../ensemble.keras')
-model_paths = ['../../Models/model_best_Tar.h5', '../../Models/model_best_Kamancheh.h5',
-               '../../Models/model_best_Santur.h5',
-               '../../Models/model_best_Setar.h5',
-               '../../Models/model_best_Ney.h5']
+model = load_model('../../ensemble.keras')
+model_paths = ['../../model_best_CNN_1.h5', '../../model_best_CNN_2.h5', '../../model_best_CNN_3.h5',
+               '../../model_best_CNN_4.h5', '../../model_best_CNN_5.h5']
 model1 = load_model(model_paths[0])
 model2 = load_model(model_paths[1], custom_objects={'TCN': TCN})
 model3 = load_model(model_paths[2], custom_objects={'PositionalEncoding': PositionalEncoding,
@@ -103,7 +116,8 @@ model4 = load_model(model_paths[3])
 model5 = load_model(model_paths[4])
 models = [model1, model2, model3, model4, model5]
 contrastive = False
-modelNew = load_model('../../model_best_CNN_2.h5')
+
+modelNew = load_model('../../model_best_CNN_1.h5')
 
 for file in files:
     true_label = extract_label(file)

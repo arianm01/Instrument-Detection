@@ -24,7 +24,7 @@ def contains(main_string, substring):
     return substring in main_string
 
 
-def read_data(dataset_path, merge_factor, duration=1, n_mfcc=13, n_fft=512, hop_length=512):
+def read_data(dataset_path, merge_factor, duration=1, n_mfcc=13, n_fft=2048, hop_length=512):
     """
     Reads audio files from the dataset directory, computes MFCC features, and returns them with labels.
     Optionally merges multiple audio samples into one data point based on the merge factor.
@@ -44,20 +44,20 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=13, n_fft=512, hop_
             - classes (list): List of class names.
     """
     x, y = [], []
-    sample_rate = 16000
+    sample_rate = 22050
     classes = ['Tar', 'Kamancheh', 'Santur', 'Setar', 'Ney']
     print(classes)
     for i, instrument in enumerate(classes):
         print(instrument)
         files = os.listdir(os.path.join(dataset_path, str(instrument)))
         process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y, i,
-                      5 * merge_factor * sample_rate, int(5 * merge_factor * sample_rate / 2))
+                      duration * merge_factor * sample_rate, int(duration * merge_factor * sample_rate / 2))
 
     y = np.array(y)
 
     target_count = max(np.bincount(y))  # Adjust target count as needed
     print(target_count)
-    # x, y = balance_dataset_with_augmentation(np.array(x), y, 16000, target_count)
+    # x, y = balance_dataset_with_augmentation(np.array(x), y, 22050, target_count)
     y = np.array(pd.get_dummies(y))
 
     print(x[0], len(y))
@@ -102,8 +102,8 @@ def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfc
         file_path = os.path.join(dataset_path, instrument, file)
         signal, sample_rate = librosa.load(file_path, duration=duration)
 
-        # if i == 12000:
-        #     break
+        if i == 12000:
+            break
 
         if not contains(file, last_file[:-9]):
             # Process the accumulated base_signal
@@ -144,8 +144,37 @@ def create_sliding_windows(signal, window_size, step_size):
 
 
 def compute_mfcc(signal, sample_rate, n_mfcc, n_fft, hop_length):
-    MFCCs = librosa.feature.mfcc(y=signal, sr=sample_rate, n_fft=n_fft, hop_length=hop_length, n_mfcc=n_mfcc)
-    return normalize_mfccs(MFCCs).T  # Normalize MFCCs
+    # MFCCs = librosa.feature.mfcc(y=signal, sr=sample_rate, n_fft=n_fft, hop_length=hop_length, n_mfcc=n_mfcc)
+    # mfccs = np.mean(MFCCs.T, axis=0)
+
+    # Extract Chromagram
+    # chromagram = librosa.feature.chroma_stft(y=signal, sr=sample_rate)
+    # chromagram = np.mean(chromagram.T, axis=0)
+
+    # Extract Spectral Contrast
+    # spectral_contrast = librosa.feature.spectral_contrast(y=signal, sr=sample_rate)
+    # spectral_contrast = np.mean(spectral_contrast.T, axis=0)
+
+    # Extract Tonnetz
+    # tonnetz = librosa.feature.tonnetz(y=librosa.effects.harmonic(signal), sr=sample_rate)
+    # tonnetz = np.mean(tonnetz.T, axis=0)
+    # print(tonnetz.shape)
+
+    spectrogram = extract_spectrogram(signal, sample_rate, n_mels=128)
+
+    # Combine all features into a single array
+    # features = np.concatenate([chromagram, spectral_contrast])
+    return spectrogram.T
+
+
+def extract_spectrogram(y, sr, n_fft=2048, hop_length=512, n_mels=64):
+    # Compute the spectrogram
+    stft = np.abs(librosa.stft(y, n_fft=n_fft, hop_length=hop_length))
+    # Convert to mel scale
+    mel_spectrogram = librosa.feature.melspectrogram(S=stft, sr=sr, n_mels=n_mels)
+    # Convert to log scale (dB)
+    log_mel_spectrogram = librosa.power_to_db(mel_spectrogram, ref=np.max)
+    return log_mel_spectrogram
 
 
 def normalize_mfccs(mfccs):
