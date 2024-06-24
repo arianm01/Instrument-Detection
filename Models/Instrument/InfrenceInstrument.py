@@ -18,7 +18,7 @@ from utility.InstrumentDataset import plot_confusion_matrix, compute_mfcc
 label_mapping = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4}
 
 
-def preprocess_audio(audio_path, segment_duration=5, n_mfcc=13):
+def preprocess_audio(audio_path, segment_duration=15, n_mfcc=13):
     try:
         signal, sample_rate = librosa.load(audio_path)
         samples_per_segment = int(sample_rate * segment_duration)
@@ -48,37 +48,37 @@ def predict(audio_path, model):
     if segments.size == 0:
         return np.array([])
     segments = segments[..., np.newaxis]
-    num_segments = segments.shape[0]
-    chunk_size = 20
-    if num_segments > chunk_size:
-        predictions = []
-
-        for start in range(0, num_segments, chunk_size):
-            end = min(start + chunk_size, num_segments)
-            segment_chunk = segments[start:end]
-            chunk_predictions = model.predict(segment_chunk)
-            predictions.append(chunk_predictions)
-
-        # Combine the predictions
-        predictions = np.concatenate(predictions, axis=0)
+    # num_segments = segments.shape[0]
+    # chunk_size = 20
+    # if num_segments > chunk_size:
+    #     predictions = []
+    #
+    #     for start in range(0, num_segments, chunk_size):
+    #         end = min(start + chunk_size, num_segments)
+    #         segment_chunk = segments[start:end]
+    #         chunk_predictions = model.predict(segment_chunk)
+    #         predictions.append(chunk_predictions)
+    #
+    #     # Combine the predictions
+    #     predictions = np.concatenate(predictions, axis=0)
+    #     return np.argmax(predictions, axis=1)
+    # else:
+    try:
+        if contrastive:
+            predictions = predict_contrastive(segments)
+        else:
+            meta = get_model_feature(segments, models)
+            predictions = model.predict(meta)
+            # predictions = model.predict(segments)
         return np.argmax(predictions, axis=1)
-    else:
-        try:
-            if contrastive:
-                predictions = predict_contrastive(segments)
-            else:
-                # meta = get_model_feature(segments, models)
-                # predictions = model.predict(meta)
-                predictions = model.predict(segments)
-            return np.argmax(predictions, axis=1)
-        except Exception as e:
-            print(f"Error during prediction for {audio_path}: {str(e)}")
-            return np.array([])
+    except Exception as e:
+        print(f"Error during prediction for {audio_path}: {str(e)}")
+        return np.array([])
 
 
 audio_path = '../../../../archive/NavaDataset'
 try:
-    with open(audio_path + '/test.txt', 'r') as file:
+    with open(audio_path + '/dev.txt', 'r') as file:
         files = [line.strip() for line in file.readlines()]
 except FileNotFoundError:
     print("File not found.")
@@ -114,15 +114,16 @@ model3 = load_model(model_paths[2], custom_objects={'PositionalEncoding': Positi
                                                     'MultiHeadSelfAttention': MultiHeadSelfAttention})
 model4 = load_model(model_paths[3])
 model5 = load_model(model_paths[4])
-models = [model1, model2, model3, model4, model5]
+# models = [model1, model2, model3, model4, model5]
+models = [model1, model2, model1]
 contrastive = False
 
-modelNew = load_model('../../model_best_CNN_1.h5')
+modelNew = load_model('../../model_best_CNN_2.h5')
 
 for file in files:
     true_label = extract_label(file)
     true_label = file[0]
-    predicted_label = predict(audio_path + '/Data/' + file + '.mp3', modelNew)
+    predicted_label = predict(audio_path + '/Data/' + file + '.mp3', model)
     true_labels.extend([true_label] * len(predicted_label))
     predicted_labels.extend(predicted_label)
     if predicted_label.size > 0:

@@ -24,7 +24,7 @@ def contains(main_string, substring):
     return substring in main_string
 
 
-def read_data(dataset_path, merge_factor, duration=1, n_mfcc=13, n_fft=2048, hop_length=512):
+def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop_length=512):
     """
     Reads audio files from the dataset directory, computes MFCC features, and returns them with labels.
     Optionally merges multiple audio samples into one data point based on the merge factor.
@@ -57,7 +57,7 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=13, n_fft=2048, hop
 
     target_count = max(np.bincount(y))  # Adjust target count as needed
     print(target_count)
-    # x, y = balance_dataset_with_augmentation(np.array(x), y, 22050, target_count)
+    x, y = balance_dataset_with_augmentation(np.array(x), y, 22050, target_count)
     y = np.array(pd.get_dummies(y))
 
     print(x[0], len(y))
@@ -160,7 +160,7 @@ def compute_mfcc(signal, sample_rate, n_mfcc, n_fft, hop_length):
     # tonnetz = np.mean(tonnetz.T, axis=0)
     # print(tonnetz.shape)
 
-    spectrogram = extract_spectrogram(signal, sample_rate, n_mels=128)
+    spectrogram = extract_spectrogram(signal, sample_rate, n_mels=64)
 
     # Combine all features into a single array
     # features = np.concatenate([chromagram, spectral_contrast])
@@ -291,3 +291,81 @@ def spec_augment(mel_spectrogram, time_warping_para=80, frequency_masking_para=2
 
 def apply_spec_augment(X):
     return np.array([spec_augment(x) for x in X])
+
+
+# def get_meta_features(models, X):
+#     """Generate meta-features using predictions from base models."""
+#     num_samples = X.shape[0]
+#     segment_length = 216
+#
+#     first_half = X[:, :segment_length, ...]
+#     second_half = X[:, segment_length:, ...]
+#     first_half_feature = []
+#     second_half_feature = []
+#
+#     num_segments = first_half.shape[0]
+#     chunk_size = 20
+#     # if num_segments > chunk_size:
+#
+#     for start in range(0, num_segments, chunk_size):
+#         end = min(start + chunk_size, num_segments)
+#         segment_chunk_1 = first_half[start:end]
+#         segment_chunk_2 = second_half[start:end]
+#         chunk_predictions_1 = np.concatenate([model.predict(segment_chunk_1) for model in models], axis=1)
+#         chunk_predictions_2 = np.concatenate([model.predict(segment_chunk_2) for model in models], axis=1)
+#         first_half_feature.append(chunk_predictions_1)
+#         second_half_feature.append(chunk_predictions_2)
+#
+#     # # Predict in batch for both halves
+#     # first_half_features = np.concatenate([model.predict(first_half) for model in models], axis=1)
+#     # second_half_features = np.concatenate([model.predict(second_half) for model in models], axis=1)
+#
+#     # Convert list of arrays to a single array
+#     first_half_features = np.concatenate(first_half_feature, axis=0)
+#     second_half_features = np.concatenate(second_half_feature, axis=0)
+#     # Concatenate features from both halves
+#     meta_features = np.concatenate([first_half_features, second_half_features], axis=1)
+#
+#     # meta_features = [model.predict(X) for model in models]
+#     # meta_features = np.concatenate(meta_features, axis=1)  # Concatenate predictions as meta-features
+#
+#     return meta_features
+
+
+def split_into_chunks(X, chunk_size):
+    """Split the input array into chunks of specified size."""
+    chunks = []
+    num_samples, total_length, *rest = X.shape
+    num_chunks = (total_length + chunk_size - 1) // chunk_size  # Ceiling division
+    for i in range(num_chunks):
+        start = i * chunk_size
+        end = min(start + chunk_size, total_length)
+        chunk = X[:, start:end, ...]
+        # If the chunk is smaller than chunk_size, pad it with zeros
+        if end - start < chunk_size:
+            padding_shape = (num_samples, chunk_size - (end - start), *rest)
+            chunk = np.pad(chunk, [(0, 0), (0, padding_shape[1]), (0, 0), (0, 0)], mode='constant')
+        chunks.append(chunk)
+    return chunks
+
+
+def get_meta_features(models, X, chunk_size=216):
+    """Generate meta-features using predictions from base models."""
+    chunks = split_into_chunks(X, chunk_size)
+    all_features = []
+    num_segments = chunks[0].shape[0]
+    chunk_size = 20
+    for chunk in chunks:
+        chunk_pred = []
+        for start in range(0, num_segments, chunk_size):
+            end = min(start + chunk_size, num_segments)
+            segment_chunk_1 = chunk[start:end]
+            chunk_predictions_1 = np.concatenate([model.predict(segment_chunk_1) for model in models], axis=1)
+            chunk_pred.append(chunk_predictions_1)
+        chunk_pred = np.concatenate(chunk_pred, axis=0)  # Flatten the list of chunk predictions
+        all_features.append(chunk_pred)
+
+    # Concatenate features from all chunks
+    meta_features = np.concatenate(all_features, axis=1)
+
+    return meta_features

@@ -1,36 +1,22 @@
 import os
 
-import keras
 import numpy as np
 import librosa
-import matplotlib.pyplot as plt
-from keras import Input, Model
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
-from keras.layers import Lambda, Dense, Concatenate
 from keras.models import load_model
-from keras.utils import to_categorical
 from keras.utils.version_utils import callbacks
-from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.metrics import classification_report
-from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
-from sklearn.preprocessing import LabelEncoder
-import tensorflow.keras.backend as K
-from sklearn.utils import compute_class_weight
-from tcn import tcn_full_summary, TCN
+from sklearn.model_selection import StratifiedKFold, train_test_split
+from tcn import tcn_full_summary
 
-from Models.Instrument.ContrastiveLearning import generate_pairs, create_base_network, euclidean_distance, \
-    contrastive_loss, generate_embeddings, evaluate_combined_contrastive_model
-from Models.Instrument.Kaggle import cnn_model, custom_model, create_classifier_model, build_tcn_model, \
-    lr_time_based_decay, cnn_model_binary, create_advanced_cnn_model
-from Models.TransformerModel import build_transformer_model, PositionalEncoding, TransformerBlock, \
-    MultiHeadSelfAttention
+from Models.Instrument.Kaggle import cnn_model, create_classifier_model, build_tcn_model, \
+    lr_time_based_decay, cnn_model_binary
+from Models.TransformerModel import build_transformer_model
 from utility import InstrumentDataset
-from utility.EuclideanDistanceLayer import EuclideanDistanceLayer
-from utility.InstrumentDataset import plot_history, plot_confusion_matrix, separate_and_balance_data
-from utility.utils import test_gpu, reshape_data, sanitize_file_name
+from utility.InstrumentDataset import plot_confusion_matrix, separate_and_balance_data, get_meta_features
+from utility.utils import test_gpu, sanitize_file_name
 
 TIME_FRAME = 1
-MERGE_FACTOR = 5
+MERGE_FACTOR = 10
 
 # Initialize GPU configuration
 test_gpu()
@@ -136,26 +122,6 @@ def evaluate_models(x, y, classes):
 #     meta_features = np.concatenate(meta_features, axis=1)  # Concatenate predictions as meta-features
 #     return meta_features
 
-def get_meta_features(models, X):
-    """Generate meta-features using predictions from base models."""
-    # num_samples = X.shape[0]
-    # segment_length = 216
-    #
-    # first_half = X[:, :segment_length, ...]
-    # second_half = X[:, segment_length:, ...]
-    #
-    # # Predict in batch for both halves
-    # first_half_features = np.concatenate([model.predict(first_half) for model in models], axis=1)
-    # second_half_features = np.concatenate([model.predict(second_half) for model in models], axis=1)
-    #
-    # # Concatenate features from both halves
-    # meta_features = np.concatenate([first_half_features, second_half_features], axis=1)
-
-    meta_features = [model.predict(X) for model in models]
-    meta_features = np.concatenate(meta_features, axis=1)  # Concatenate predictions as meta-features
-
-    return meta_features
-
 
 def train_meta_model(X_train, y_train, x_test, y_test, models):
     """Train meta-model using meta-features."""
@@ -205,8 +171,7 @@ def train_models_by_instrument(X, y, instruments, save_dir="models"):
 
 def ensemble_learning(x, y, instruments):
     models = [load_model('./model_best_CNN_1.h5'), load_model('./model_best_CNN_2.h5'),
-              load_model('./model_best_CNN_3.h5'), load_model('./model_best_CNN_4.h5'),
-              load_model('./model_best_CNN_5.h5'), ]
+              load_model('./model_best_CNN_1.h5')]
     meta_features = get_model_feature(x, models)
     # instrument_models = train_models_by_instrument(x, y, instruments)
 
@@ -234,9 +199,9 @@ def get_model_feature(x, models=None):
 
 def main():
     x, y, classes = load_data()
-    histories = train_models(x, y)
+    # histories = train_models(x, y)
     # histories = train_contrastive_model(x, y)
-    # ensemble_learning(x, y, classes)
+    ensemble_learning(x, y, classes)
 
     # for history in histories:
     #     plot_history(history)
