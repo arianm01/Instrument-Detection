@@ -10,6 +10,7 @@ from tcn import tcn_full_summary
 
 from Models.Instrument.Kaggle import cnn_model, create_classifier_model, build_tcn_model, \
     lr_time_based_decay, cnn_model_binary
+from Models.MixtureExperts import train, create_gating_network, generate_performance_labels
 from Models.TransformerModel import build_transformer_model
 from utility import InstrumentDataset
 from utility.InstrumentDataset import plot_confusion_matrix, separate_and_balance_data, get_meta_features
@@ -57,6 +58,9 @@ def train_models(x, y):
     for fold_no, (train_index, test_index) in enumerate(skf.split(x, y_labels), start=1):
         x_train, x_test = x[train_index], x[test_index]
         y_train, y_test = y[train_index], y[test_index]
+
+        if fold_no < 5:
+            continue
 
         print(f'Training fold {fold_no}...')
         input_shape = (x_train.shape[1], x_train.shape[2], 1)
@@ -116,13 +120,6 @@ def evaluate_models(x, y, classes):
     plot_confusion_matrix(y_true_labels, y_pred_labels, classes)
 
 
-# def get_meta_features(models, X):
-#     """Generate meta-features using predictions from base models."""
-#     meta_features = [model.predict(X) for model in models]
-#     meta_features = np.concatenate(meta_features, axis=1)  # Concatenate predictions as meta-features
-#     return meta_features
-
-
 def train_meta_model(X_train, y_train, x_test, y_test, models):
     """Train meta-model using meta-features."""
     input_shape = X_train.shape[1]
@@ -170,8 +167,9 @@ def train_models_by_instrument(X, y, instruments, save_dir="models"):
 
 
 def ensemble_learning(x, y, instruments):
-    models = [load_model('./model_best_CNN_1.h5'), load_model('./model_best_CNN_2.h5'),
-              load_model('./model_best_CNN_1.h5')]
+    models = [load_model('./model_best_CNN_1.h5'), load_model('./model_best_CNN_6.h5'),
+              load_model('./model_best_CNN_7.h5'), load_model('./model_best_CNN_4.h5'),
+              load_model('./model_best_CNN_5.h5')]
     meta_features = get_model_feature(x, models)
     # instrument_models = train_models_by_instrument(x, y, instruments)
 
@@ -197,11 +195,26 @@ def get_model_feature(x, models=None):
     return meta_features
 
 
+def expert_training(x, y, classes):
+    models = [load_model('./model_best_CNN_1.h5'), load_model('./model_best_CNN_4.h5'),
+              load_model('./model_best_CNN_5.h5'), load_model('./model_best_CNN_6.h5'),
+              load_model('./model_best_CNN_7.h5')]
+
+    # Generate labels for the first-level gating network
+    first_level_labels = generate_performance_labels(models, x, y)
+
+    print(first_level_labels)
+
+    X_train, X_val, y_train, y_val = train_test_split(x, first_level_labels, test_size=0.2, random_state=42)
+    train(X_train, y_train, X_val, y_val, models)
+
+
 def main():
     x, y, classes = load_data()
     # histories = train_models(x, y)
     # histories = train_contrastive_model(x, y)
     ensemble_learning(x, y, classes)
+    # expert_training(x, y, classes)
 
     # for history in histories:
     #     plot_history(history)

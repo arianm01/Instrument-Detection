@@ -10,6 +10,7 @@ from tcn import TCN
 from tensorflow.keras.models import load_model
 
 from Models.Instrument.ContrastiveLearning import generate_embeddings, contrastive_loss
+from Models.MixtureExperts import get_moe_prediction
 from Models.TransformerModel import PositionalEncoding, TransformerBlock, MultiHeadSelfAttention
 from main import get_model_feature
 from utility.EuclideanDistanceLayer import EuclideanDistanceLayer
@@ -18,7 +19,7 @@ from utility.InstrumentDataset import plot_confusion_matrix, compute_mfcc
 label_mapping = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4}
 
 
-def preprocess_audio(audio_path, segment_duration=15, n_mfcc=13):
+def preprocess_audio(audio_path, segment_duration=10, n_mfcc=13):
     try:
         signal, sample_rate = librosa.load(audio_path)
         samples_per_segment = int(sample_rate * segment_duration)
@@ -69,6 +70,7 @@ def predict(audio_path, model):
         else:
             meta = get_model_feature(segments, models)
             predictions = model.predict(meta)
+            # predictions = get_moe_prediction(segments, models, model)
             # predictions = model.predict(segments)
         return np.argmax(predictions, axis=1)
     except Exception as e:
@@ -78,7 +80,7 @@ def predict(audio_path, model):
 
 audio_path = '../../../../archive/NavaDataset'
 try:
-    with open(audio_path + '/dev.txt', 'r') as file:
+    with open(audio_path + '/test.txt', 'r') as file:
         files = [line.strip() for line in file.readlines()]
 except FileNotFoundError:
     print("File not found.")
@@ -105,7 +107,7 @@ def extract_label(file_name):
 #                         custom_objects={'contrastive_loss': contrastive_loss,
 #                                         'EuclideanDistanceLayer': EuclideanDistanceLayer})
 model = load_model('../../ensemble.keras')
-model_paths = ['../../model_best_CNN_1.h5', '../../model_best_CNN_2.h5', '../../model_best_CNN_3.h5',
+model_paths = ['../../model_best_CNN_1.h5', '../../model_best_CNN_6.h5', '../../model_best_CNN_7.h5',
                '../../model_best_CNN_4.h5', '../../model_best_CNN_5.h5']
 model1 = load_model(model_paths[0])
 model2 = load_model(model_paths[1], custom_objects={'TCN': TCN})
@@ -114,11 +116,12 @@ model3 = load_model(model_paths[2], custom_objects={'PositionalEncoding': Positi
                                                     'MultiHeadSelfAttention': MultiHeadSelfAttention})
 model4 = load_model(model_paths[3])
 model5 = load_model(model_paths[4])
-# models = [model1, model2, model3, model4, model5]
-models = [model1, model2, model1]
+models = [model1, model2, model3, model4, model5]
+# models = [model1, model2, model1]
 contrastive = False
 
-modelNew = load_model('../../model_best_CNN_2.h5')
+modelNew = load_model('../../model_best_CNN_7.h5')
+model_MoE = load_model('../../mixture_ensemble.keras')
 
 for file in files:
     true_label = extract_label(file)

@@ -102,7 +102,7 @@ def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfc
         file_path = os.path.join(dataset_path, instrument, file)
         signal, sample_rate = librosa.load(file_path, duration=duration)
 
-        if i == 12000:
+        if i == 12600:
             break
 
         if not contains(file, last_file[:-9]):
@@ -175,16 +175,6 @@ def extract_spectrogram(y, sr, n_fft=2048, hop_length=512, n_mels=64):
     # Convert to log scale (dB)
     log_mel_spectrogram = librosa.power_to_db(mel_spectrogram, ref=np.max)
     return log_mel_spectrogram
-
-
-def normalize_mfccs(mfccs):
-    # Calculate mean and standard deviation of the MFCCs
-    # mean = np.mean(mfccs, axis=0)
-    # std = np.std(mfccs, axis=0)
-    #
-    # # Apply Z-score normalization
-    # normalized_mfccs = (mfccs - mean) / std
-    return mfccs
 
 
 def plot_history(history):
