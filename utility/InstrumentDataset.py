@@ -51,7 +51,7 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop
         print(instrument)
         files = os.listdir(os.path.join(dataset_path, str(instrument)))
         process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y, i,
-                      duration * merge_factor * sample_rate, int(duration * merge_factor * sample_rate / 2))
+                      duration * merge_factor * sample_rate, int(duration * merge_factor * sample_rate))
 
     y = np.array(y)
 
@@ -102,8 +102,8 @@ def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfc
         file_path = os.path.join(dataset_path, instrument, file)
         signal, sample_rate = librosa.load(file_path, duration=duration)
 
-        if i == 12600:
-            break
+        # if i == 12600:
+        #     break
 
         if not contains(file, last_file[:-9]):
             # Process the accumulated base_signal
@@ -339,7 +339,7 @@ def split_into_chunks(X, chunk_size):
     return chunks
 
 
-def get_meta_features(models, X, chunk_size=216):
+def get_meta_features(models, X, chunk_size=44):
     """Generate meta-features using predictions from base models."""
     chunks = split_into_chunks(X, chunk_size)
     all_features = []
