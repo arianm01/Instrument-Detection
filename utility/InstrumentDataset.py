@@ -24,7 +24,17 @@ def contains(main_string, substring):
     return substring in main_string
 
 
-def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop_length=512):
+def get_files(instrument, folder):
+    try:
+        with open(f'./{folder}/' + instrument + '.txt', 'r') as file:
+            return [line.strip() for line in file.readlines()]
+    except FileNotFoundError:
+        print("File not found.")
+        return []
+
+
+def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop_length=512, folder='train',
+              balance_needed=True):
     """
     Reads audio files from the dataset directory, computes MFCC features, and returns them with labels.
     Optionally merges multiple audio samples into one data point based on the merge factor.
@@ -36,7 +46,8 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop
         n_fft (int): Length of the FFT window.
         hop_length (int): Number of samples between successive frames.
         merge_factor (int): Number of audio samples to merge into one data point.
-
+        folder (str): Path to the folder
+        balance_needed (bool): Whether to balance the data points
     Returns:
         tuple: Tuple containing:
             - x (list of np.array): MFCCs of each audio file (or merged files).
@@ -45,21 +56,24 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop
     """
     x, y = [], []
     sample_rate = 22050
-    classes = ['Tar', 'Kamancheh', 'Santur', 'Setar', 'Ney']
+    # classes = ['Tar', 'Kamancheh', 'Santur', 'Setar', 'Ney']
+    classes = os.listdir(dataset_path)
     print(classes)
     for i, instrument in enumerate(classes):
         print(instrument)
-        files = os.listdir(os.path.join(dataset_path, str(instrument)))
+        # files = os.listdir(os.path.join(dataset_path, str(instrument)))
+        files = get_files(instrument, folder)
+        files.sort()
         process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y, i,
-                      duration * merge_factor * sample_rate, int(duration * merge_factor * sample_rate / 4))
+                      duration * merge_factor * sample_rate, int(duration * merge_factor * sample_rate / merge_factor))
 
     y = np.array(y)
 
     target_count = max(np.bincount(y))  # Adjust target count as needed
     print(target_count)
-    x, y = balance_dataset_with_augmentation(np.array(x), y, 22050, target_count)
+    if balance_needed:
+        x, y = balance_dataset_with_augmentation(np.array(x), y, 22050, target_count)
     y = np.array(pd.get_dummies(y))
-
     print(x[0], len(y))
     return x, y, classes
 
@@ -101,9 +115,6 @@ def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfc
     for i, file in enumerate(tqdm(files)):
         file_path = os.path.join(dataset_path, instrument, file)
         signal, sample_rate = librosa.load(file_path, duration=duration)
-
-        # if i == 12600:
-        #     break
 
         if not contains(file, last_file[:-9]):
             # Process the accumulated base_signal
@@ -283,49 +294,11 @@ def apply_spec_augment(X):
     return np.array([spec_augment(x) for x in X])
 
 
-# def get_meta_features(models, X):
-#     """Generate meta-features using predictions from base models."""
-#     num_samples = X.shape[0]
-#     segment_length = 216
-#
-#     first_half = X[:, :segment_length, ...]
-#     second_half = X[:, segment_length:, ...]
-#     first_half_feature = []
-#     second_half_feature = []
-#
-#     num_segments = first_half.shape[0]
-#     chunk_size = 20
-#     # if num_segments > chunk_size:
-#
-#     for start in range(0, num_segments, chunk_size):
-#         end = min(start + chunk_size, num_segments)
-#         segment_chunk_1 = first_half[start:end]
-#         segment_chunk_2 = second_half[start:end]
-#         chunk_predictions_1 = np.concatenate([model.predict(segment_chunk_1) for model in models], axis=1)
-#         chunk_predictions_2 = np.concatenate([model.predict(segment_chunk_2) for model in models], axis=1)
-#         first_half_feature.append(chunk_predictions_1)
-#         second_half_feature.append(chunk_predictions_2)
-#
-#     # # Predict in batch for both halves
-#     # first_half_features = np.concatenate([model.predict(first_half) for model in models], axis=1)
-#     # second_half_features = np.concatenate([model.predict(second_half) for model in models], axis=1)
-#
-#     # Convert list of arrays to a single array
-#     first_half_features = np.concatenate(first_half_feature, axis=0)
-#     second_half_features = np.concatenate(second_half_feature, axis=0)
-#     # Concatenate features from both halves
-#     meta_features = np.concatenate([first_half_features, second_half_features], axis=1)
-#
-#     # meta_features = [model.predict(X) for model in models]
-#     # meta_features = np.concatenate(meta_features, axis=1)  # Concatenate predictions as meta-features
-#
-#     return meta_features
-
-
 def split_into_chunks(X, chunk_size):
     """Split the input array into chunks of specified size."""
     chunks = []
     num_samples, total_length, *rest = X.shape
+    print(X.shape)
     num_chunks = (total_length + chunk_size - 1) // chunk_size  # Ceiling division
     for i in range(num_chunks):
         start = i * chunk_size

@@ -17,7 +17,7 @@ from utility.InstrumentDataset import plot_confusion_matrix, separate_and_balanc
 from utility.utils import test_gpu, sanitize_file_name
 
 TIME_FRAME = 1
-MERGE_FACTOR = 5
+MERGE_FACTOR = 1
 
 # Initialize GPU configuration
 test_gpu()
@@ -34,7 +34,7 @@ def extract_features(signal, frame_size, hop_length):
 def load_data():
     """ Load and preprocess data """
     x, y, classes = InstrumentDataset.read_data('./Models/Instrument/audio_segments_test', MERGE_FACTOR, TIME_FRAME)
-    # x, y, classes = InstrumentDataset.read_data('./Dataset', MERGE_FACTOR, TIME_FRAME)
+    # x, y, classes = InstrumentDataset.read_data('../../archive/NavaDataset/Data/', MERGE_FACTOR, TIME_FRAME)
     print(np.array(x).shape)
     X = np.array(x)[..., np.newaxis]  # Add an extra dimension for the channels
     print(f'The shape of X is {X.shape}')
@@ -59,15 +59,15 @@ def train_models(x, y):
         x_train, x_test = x[train_index], x[test_index]
         y_train, y_test = y[train_index], y[test_index]
 
-        if fold_no < 5:
+        if fold_no < 3:
             continue
 
         print(f'Training fold {fold_no}...')
         input_shape = (x_train.shape[1], x_train.shape[2], 1)
         num_classes = y_train.shape[1]
-        layer_sizes = [128, 64, 32, 16]
+        layer_sizes = [128, 64, 48, 32, 16]
         # history = custom_model(input_shape, num_classes, fold_no, X_train, y_train, X_test, y_test)
-        history = cnn_model(input_shape, num_classes, layer_sizes, x_train, y_train, x_test, y_test, fold_no, 16, 100)
+        history = cnn_model(input_shape, num_classes, layer_sizes, x_train, y_train, x_test, y_test, fold_no, 8, 80)
         # history = create_advanced_cnn_model(input_shape, num_classes, x_train, y_train, x_test, y_test, fold_no)
         # history = tcn_model(num_classes, x_test, x_train, y_test, y_train)
         # history = transformer(input_shape, num_classes, x_test, x_train, y_test, y_train)
@@ -166,7 +166,7 @@ def train_models_by_instrument(X, y, instruments, save_dir="models"):
     return instrument_models
 
 
-def ensemble_learning(x, y, instruments, models):
+def ensemble_learning(x, y, models):
     meta_features = get_model_feature(x, models)
     # instrument_models = train_models_by_instrument(x, y, instruments)
 
@@ -202,17 +202,17 @@ def expert_training(x, y, classes, models):
 
 def main():
     x, y, classes = load_data()
-    # histories = train_models(x, y)
+    histories = train_models(x, y)
     # histories = train_contrastive_model(x, y)
     # Structure of the 2-seconds model
-    models = [load_model('./model_best_CNN_6.h5'), load_model('./model_best_CNN_7.h5'),
-              load_model('./model_best_CNN_10.h5'), load_model('./model_best_CNN_8.h5'),
-              load_model('./model_best_CNN_9.h5')]
-    # models = [load_model('./model_best_CNN_1.h5'), load_model('./model_best_CNN_2.h5'),
-    #           load_model('./model_best_CNN_3.h5'), load_model('./model_best_CNN_4.h5'),
-    #           load_model('./model_best_CNN_5.h5')]
-    # ensemble_learning(x, y, classes, models)
-    expert_training(x, y, classes, models)
+    # models = [load_model('./model_best_CNN_6.h5'), load_model('./model_best_CNN_7.h5'),
+    #           load_model('./model_best_CNN_10.h5'), load_model('./model_best_CNN_8.h5'),
+    #           load_model('./model_best_CNN_9.h5')]
+    models = [load_model('./model_best_CNN_1.h5'), load_model('./model_best_CNN_2.h5'),
+              load_model('./model_best_CNN_3.h5'), load_model('./model_best_CNN_4.h5'),
+              load_model('./model_best_CNN_5.h5')]
+    ensemble_learning(x, y, models)
+    # expert_training(x, y, classes, models)
 
     # for history in histories:
     #     plot_history(history)

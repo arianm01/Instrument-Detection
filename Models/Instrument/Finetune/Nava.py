@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -7,28 +8,35 @@ from keras.saving.save import load_model
 from keras.utils import to_categorical
 from sklearn.model_selection import StratifiedKFold
 
-from Models.Instrument.InfrenceInstrument import preprocess_audio, load_files, dataset_path, model_path, input_dir, \
-    extract_label
+from Models.Instrument.InfrenceInstrument import preprocess_audio, load_files, extract_label
 from Models.Instrument.Kaggle import lr_time_based_decay
-from utility.InstrumentDataset import plot_history
+from main import train_models, ensemble_learning
+from utility.InstrumentDataset import plot_history, process_files
+from utility.utils import balance_dataset_with_augmentation
+
+TIME_FRAME = 1
+MERGE_FACTOR = 5
+sample_rate = 22050
 
 
 def load_nava_data():
+    dataset_path = '../../../../../archive/NavaDataset'
     files = load_files("../" + dataset_path)
     true_labels = []
     x, y = [], []
 
-    print(files)
     for file in files:
         print(f"Loading {file}")
         true_label = extract_label(file)
-        segments = preprocess_audio(os.path.join("../" + dataset_path, 'Data', file + '.mp3'))
+        segments = preprocess_audio(os.path.join("../" + dataset_path, 'Data', file + '.mp3'),
+                                    step_size=TIME_FRAME * sample_rate,
+                                    segment_duration=TIME_FRAME * MERGE_FACTOR * sample_rate)
         true_labels.extend([true_label] * len(segments))
         x.extend(segments)
         y.extend(true_labels)
         true_labels = []
-    y = to_categorical(y, num_classes=16)
-    x = np.array(x)
+    y = to_categorical(y)
+    x = np.array(x)[..., np.newaxis]  # Add an extra dimension for the channels
     return x, y
 
 
@@ -68,10 +76,14 @@ def tune_models(x, y):
 
 def main():
     x, y = load_nava_data()
-    histories = tune_models(x, y)
+    models = [load_model('./model_best_CNN_1.h5'), load_model('./model_best_CNN_2.h5'),
+              load_model('./model_best_CNN_3.h5'), load_model('./model_best_CNN_4.h5'),
+              load_model('./model_best_CNN_5.h5')]
+    # histories = train_models(x, y)
+    ensemble_learning(x, y, models)
 
-    for history in histories:
-        plot_history(history)
+    # for history in histories:
+    #     plot_history(history)
 
 
 if __name__ == '__main__':
