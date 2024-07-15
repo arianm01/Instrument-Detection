@@ -10,26 +10,39 @@ from Models.MixtureExperts import get_moe_prediction
 from Models.TransformerModel import PositionalEncoding, TransformerBlock, MultiHeadSelfAttention
 from main import get_model_feature
 from utility.EuclideanDistanceLayer import EuclideanDistanceLayer
-from utility.InstrumentDataset import plot_confusion_matrix, compute_mfcc
+from utility.InstrumentDataset import plot_confusion_matrix, compute_mfcc, create_sliding_windows
 
 # Constants
 LABEL_MAPPING = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4}
+All_LABEL_MAPPING = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10, 11: 11, 12: 12, 13: 13, 14: 14}
 CLASSES = ['Tar', 'Kamancheh', 'Santur', 'Setar', 'Ney']
+All_CLASSES = ['Daf', 'Divan', 'Dutar', 'Gheychak', 'Kamancheh', 'Ney', 'Ney Anban', 'Oud', 'Qanun', 'Rubab', 'Santur',
+               'Setar', 'Tanbour', 'Tar', 'Tonbak']
 
 
 def load_files(audio_path):
     """Loads the list of files to process."""
     try:
-        with open(audio_path + '/dev.txt', 'r') as file:
+        with open(audio_path + '/dev_original.txt', 'r') as file:
             return [line.strip() for line in file.readlines()]
     except FileNotFoundError:
         print("File not found.")
         return []
 
 
-def preprocess_audio(audio_path, segment_duration=5, n_mfcc=13):
+def preprocess_audio(audio_path, segment_duration=1, n_mfcc=13, step_size=None):
     """Preprocesses the audio file into MFCC segments."""
     try:
+        if step_size is not None:
+            signal, sample_rate = librosa.load(audio_path)
+            windows = create_sliding_windows(signal, segment_duration, step_size)
+            mfccs = []
+
+            for i, window in enumerate(windows):
+                mfcc = compute_mfcc(window, sample_rate, n_mfcc, 1, 1)
+                mfccs.append(mfcc)
+            return mfccs
+
         signal, sample_rate = librosa.load(audio_path)
         samples_per_segment = int(sample_rate * segment_duration)
         num_segments = int(np.ceil(len(signal) / samples_per_segment))
@@ -54,9 +67,9 @@ def predict_segments(segments, model, models, model_base, contrastive=False):
         if contrastive:
             predictions = predict_contrastive(segments, model)
         else:
-            # meta = get_model_feature(segments, models)
-            # predictions = model.predict(meta)
-            predictions = get_moe_prediction(segments, models, model_base, chunk_size=44)
+            meta = get_model_feature(segments, models)
+            predictions = model.predict(meta)
+            # predictions = get_moe_prediction(segments, models, model_base, chunk_size=44)
             # predictions = model.predict(segments)
         return np.argmax(predictions, axis=1)
     except Exception as e:
@@ -87,13 +100,14 @@ def extract_label(file_name):
         return None
 
 
-def load_models():
+def load_models(addr_model, addr_models, addr_model_base):
     """Loads the required models."""
-    model = load_model('../../ensemble.keras')
-    models = [load_model('../../model_best_CNN_6.h5'), load_model('../../model_best_CNN_7.h5'),
-              load_model('../../model_best_CNN_10.h5'), load_model('../../model_best_CNN_8.h5'),
-              load_model('../../model_best_CNN_9.h5')]
-    model_base = load_model('../../mixture_ensemble.keras')
+    model = load_model(addr_model)
+    models = [load_model(addr_models[0]), load_model(addr_models[1]), load_model(addr_models[2]),
+              load_model(addr_models[3]), load_model(addr_models[4])]
+    # model_base = load_model(addr_model_base)
+    # models = []
+    model_base = 2
     return model, models, model_base
 
 
@@ -148,7 +162,8 @@ def evaluate_predictions(true_labels, predicted_labels):
 def calculate_class_accuracies(conf_matrix):
     """Calculates accuracies for each class."""
     class_accuracies = {}
-    for i, class_label in enumerate(LABEL_MAPPING.values()):
+    # for i, class_label in enumerate(LABEL_MAPPING.values()):
+    for i, class_label in enumerate(All_LABEL_MAPPING.values()):
         true_positives = conf_matrix[i, i]
         total_predictions = conf_matrix[:, i].sum()
         accuracy = true_positives / total_predictions if total_predictions > 0 else 0
@@ -159,7 +174,8 @@ def calculate_class_accuracies(conf_matrix):
 def display_class_accuracies(class_accuracies):
     """Displays accuracies for each class."""
     for label, acc in class_accuracies.items():
-        print(f"Accuracy for class {CLASSES[label]}: {acc * 100:.2f}%")
+        # print(f"Accuracy for class {CLASSES[label]}: {acc * 100:.2f}%")
+        print(f"Accuracy for class {All_CLASSES[label]}: {acc * 100:.2f}%")
 
 
 def calculate_overall_accuracy(conf_matrix):
@@ -171,20 +187,24 @@ def calculate_overall_accuracy(conf_matrix):
 
 def display_f1_scores(f1_scores, macro_f1_score):
     """Displays F1 scores for each class and the macro-average F1 score."""
-    for i, label in enumerate(LABEL_MAPPING.values()):
-        print(f"F1 Score for class {CLASSES[label]}: {f1_scores[i]:.2f}")
+    # for i, label in enumerate(LABEL_MAPPING.values()):
+    #     print(f"F1 Score for class {CLASSES[label]}: {f1_scores[i]:.2f}")
+    for i, label in enumerate(All_LABEL_MAPPING.values()):
+        print(f"F1 Score for class {All_CLASSES[label]}: {f1_scores[i]:.2f}")
     print(f"Macro-average F1 Score: {macro_f1_score:.2f}")
 
 
 def main():
     audio_path = '../../../../archive/NavaDataset'
     files = load_files(audio_path)
-    model, models, model_base = load_models()
+    models_addr = ['./Finetune/model_best_CNN_1.h5', './Finetune/model_best_CNN_2.h5', './Finetune/model_best_CNN_3.h5',
+                   './Finetune/model_best_CNN_4.h5', './Finetune/model_best_CNN_5.h5']
+    model, models, model_base = load_models('../../model_best_CNN_2.h5', models_addr,
+                                            '../../output/2 seconds/mixture_ensemble.keras')
     contrastive = False
 
     true_labels, predicted_labels = process_files(files, audio_path, model, models, model_base, contrastive)
     evaluate_predictions(true_labels, predicted_labels)
 
-
-if __name__ == "__main__":
-    main()
+    if __name__ == "__main__":
+        main()

@@ -45,13 +45,15 @@ def cnn_model(input_shape, num_classes, layer_sizes, X_train, y_train, X_test, y
     model.add(layers.Flatten())
     model.add(layers.Dense(256, activation='relu'))
     model.add(layers.Dropout(0.3))
+    model.add(layers.Dense(128, activation='relu'))
+    model.add(layers.Dropout(0.3))
     model.add(layers.Dense(num_classes, activation='softmax'))
 
     model_checkpoint_path = f'model_best_CNN_{instrument}.h5'
     model_checkpoint_callback = callbacks.ModelCheckpoint(
         filepath=model_checkpoint_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
     lr_scheduler = callbacks.LearningRateScheduler(lr_time_based_decay, verbose=1)
-    early_stopping = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True)
+    early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model.fit(X_train, y_train, validation_data=(X_test, y_test),
