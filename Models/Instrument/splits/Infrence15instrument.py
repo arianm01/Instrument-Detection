@@ -13,8 +13,13 @@ def get_predicted_results(model, models, model_base, x):
 
 def main():
     audio_path = '../audio_segments_test'
-    x, y, _ = InstrumentDataset.read_data(audio_path, MERGE_FACTOR, TIME_FRAME, folder='test', balance_needed=False)
-    model, models, model_base = load_models('../../../model_best_CNN_2.h5', [], '')
+
+    x, y, _ = InstrumentDataset.read_data(audio_path, MERGE_FACTOR, TIME_FRAME, folder='./test', balance_needed=False)
+    model, models, model_base = load_models('../../../ensemble.keras', ['../../../model_best_CNN_1.h5',
+                                                                        '../../../model_best_CNN_2.h5',
+                                                                        '../../../model_best_CNN_3.h5',
+                                                                        '../../../model_best_CNN_4.h5',
+                                                                        '../../../model_best_CNN_5.h5'], '')
 
     x = np.array(x)
     x = x[..., np.newaxis]

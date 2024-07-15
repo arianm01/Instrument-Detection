@@ -17,7 +17,7 @@ from utility.InstrumentDataset import plot_confusion_matrix, separate_and_balanc
 from utility.utils import test_gpu, sanitize_file_name
 
 TIME_FRAME = 1
-MERGE_FACTOR = 1
+MERGE_FACTOR = 2
 
 # Initialize GPU configuration
 test_gpu()
@@ -65,7 +65,7 @@ def train_models(x, y):
         print(f'Training fold {fold_no}...')
         input_shape = (x_train.shape[1], x_train.shape[2], 1)
         num_classes = y_train.shape[1]
-        layer_sizes = [128, 64, 48, 32, 16]
+        layer_sizes = [256, 128, 64, 32, 16]
         # history = custom_model(input_shape, num_classes, fold_no, X_train, y_train, X_test, y_test)
         history = cnn_model(input_shape, num_classes, layer_sizes, x_train, y_train, x_test, y_test, fold_no, 8, 80)
         # history = create_advanced_cnn_model(input_shape, num_classes, x_train, y_train, x_test, y_test, fold_no)
@@ -124,7 +124,7 @@ def train_meta_model(X_train, y_train, x_test, y_test, models):
     """Train meta-model using meta-features."""
     input_shape = X_train.shape[1]
 
-    model = create_classifier_model(input_shape, 5, [128, 64, 32, 16])
+    model = create_classifier_model(input_shape, 15, [128, 64, 32, 16])
     model_checkpoint_callback = callbacks.ModelCheckpoint(
         filepath='ensemble.keras', save_best_only=True, monitor='val_loss', mode='min', verbose=1)
     model.compile(loss='categorical_crossentropy', optimizer='adam')
@@ -202,7 +202,7 @@ def expert_training(x, y, classes, models):
 
 def main():
     x, y, classes = load_data()
-    histories = train_models(x, y)
+    # histories = train_models(x, y)
     # histories = train_contrastive_model(x, y)
     # Structure of the 2-seconds model
     # models = [load_model('./model_best_CNN_6.h5'), load_model('./model_best_CNN_7.h5'),

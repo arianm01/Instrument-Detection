@@ -26,14 +26,15 @@ def contains(main_string, substring):
 
 def get_files(instrument, folder):
     try:
-        with open(f'./{folder}/' + instrument + '.txt', 'r') as file:
+        with open(folder + '/' + instrument + '.txt', 'r') as file:
             return [line.strip() for line in file.readlines()]
     except FileNotFoundError:
         print("File not found.")
         return []
 
 
-def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop_length=512, folder='train',
+def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop_length=512,
+              folder='./Models/Instrument/splits/train',
               balance_needed=True):
     """
     Reads audio files from the dataset directory, computes MFCC features, and returns them with labels.
@@ -65,7 +66,7 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop
         files = get_files(instrument, folder)
         files.sort()
         process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y, i,
-                      duration * merge_factor * sample_rate, int(duration * merge_factor * sample_rate / merge_factor))
+                      duration * merge_factor * sample_rate, int(duration * sample_rate))
 
     y = np.array(y)
 
