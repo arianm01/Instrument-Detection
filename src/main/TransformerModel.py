@@ -156,7 +156,6 @@ ff_dim = 128
 num_blocks = 2
 
 model = build_transformer_model(input_shape, num_classes, embed_dim, num_heads, ff_dim, num_blocks)
-model.summary()
 
 # Assuming you have prepared your data
 # X_train, y_train, X_val, y_val = ...

@@ -83,7 +83,7 @@ def split_data(input_dir, output_dir, train_ratio=0.8, val_ratio=0.1, test_ratio
     """
     Split data into train, validation, and test sets.
 
-    :param input_dir: Directory containing instrument folders with files.
+    :param input_dir: Directory containing Instrument folders with files.
     :param output_dir: Directory where the splits will be saved.
     :param train_ratio: Ratio of training data.
     :param val_ratio: Ratio of validation data.

@@ -2,9 +2,9 @@ import os
 
 import numpy as np
 
-from Models.Instrument.InfrenceInstrument import load_models, evaluate_predictions, predict_segments
-from main import MERGE_FACTOR, TIME_FRAME
-from utility import InstrumentDataset
+from src.Infrence.InfrenceInstrument import predict_segments, load_models, evaluate_predictions
+from src.main.main import MERGE_FACTOR, TIME_FRAME
+from src.utility import InstrumentDataset
 
 
 def get_predicted_results(model, models, model_base, x):

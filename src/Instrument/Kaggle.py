@@ -12,9 +12,9 @@ from tcn import TCN
 from tensorflow.keras import Sequential, callbacks, layers, regularizers, models
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 
-from Models.Instrument.ContrastiveLearning import generate_pairs, create_base_network, contrastive_loss, \
+from src.Instrument.ContrastiveLearning import generate_pairs, create_base_network, contrastive_loss, \
     generate_embeddings
-from utility.EuclideanDistanceLayer import EuclideanDistanceLayer
+from src.utility.EuclideanDistanceLayer import EuclideanDistanceLayer
 
 # Set constants for the learning rate schedule
 INITIAL_LEARNING_RATE = 0.0001
@@ -62,7 +62,7 @@ def cnn_model(input_shape, num_classes, layer_sizes, X_train, y_train, X_test, y
 
 
 def create_advanced_cnn_model(input_shape, num_classes, X_train, y_train, X_test, y_test, instrument):
-    """Create an advanced CNN model for instrument classification."""
+    """Create an advanced CNN model for Instrument classification."""
     model = Sequential()
 
     # Input layer

@@ -8,16 +8,16 @@ from keras.utils.version_utils import callbacks
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from tcn import tcn_full_summary
 
-from Models.Instrument.Kaggle import cnn_model, create_classifier_model, build_tcn_model, \
-    lr_time_based_decay, cnn_model_binary
-from Models.MixtureExperts import train, create_gating_network, generate_performance_labels
-from Models.TransformerModel import build_transformer_model
-from utility import InstrumentDataset
-from utility.InstrumentDataset import plot_confusion_matrix, separate_and_balance_data, get_meta_features
-from utility.utils import test_gpu, sanitize_file_name
+from src.Instrument.Kaggle import cnn_model, lr_time_based_decay, build_tcn_model, create_classifier_model, \
+    cnn_model_binary
+from src.Instrument.MixtureExperts import generate_performance_labels, train
+from src.main.TransformerModel import build_transformer_model
+from src.utility import InstrumentDataset
+from src.utility.InstrumentDataset import plot_confusion_matrix, separate_and_balance_data, get_meta_features
+from src.utility.utils import test_gpu, sanitize_file_name
 
 TIME_FRAME = 1
-MERGE_FACTOR = 2
+MERGE_FACTOR = 1
 
 # Initialize GPU configuration
 test_gpu()
@@ -33,7 +33,7 @@ def extract_features(signal, frame_size, hop_length):
 
 def load_data():
     """ Load and preprocess data """
-    x, y, classes = InstrumentDataset.read_data('./Models/Instrument/audio_segments_test', MERGE_FACTOR, TIME_FRAME)
+    x, y, classes = InstrumentDataset.read_data('./Dataset', MERGE_FACTOR, TIME_FRAME)
     # x, y, classes = InstrumentDataset.read_data('../../archive/NavaDataset/Data/', MERGE_FACTOR, TIME_FRAME)
     print(np.array(x).shape)
     X = np.array(x)[..., np.newaxis]  # Add an extra dimension for the channels
@@ -135,7 +135,7 @@ def train_meta_model(X_train, y_train, x_test, y_test, models):
 
 
 def train_models_by_instrument(X, y, instruments, save_dir="models"):
-    """Train a separate binary classifier model for each instrument."""
+    """Train a separate binary classifier model for each Instrument."""
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -143,7 +143,7 @@ def train_models_by_instrument(X, y, instruments, save_dir="models"):
     instrument_models = {}
 
     for instrument, (X_inst, y_inst) in instrument_data.items():
-        print("Training model for instrument", X_inst.shape, instrument, y_inst.shape)
+        print("Training model for Instrument", X_inst.shape, instrument, y_inst.shape)
 
         # skf = StratifiedKFold(n_splits=1, shuffle=True, random_state=42)
         # histories = []
@@ -159,7 +159,7 @@ def train_models_by_instrument(X, y, instruments, save_dir="models"):
         input_shape = (x_train.shape[1], x_train.shape[2], 1)
         num_classes = 1
         layer_sizes = [128, 64]
-        print(f"Training model for instrument: {instrument}")
+        print(f"Training model for Instrument: {instrument}")
         history = cnn_model_binary(input_shape, num_classes, layer_sizes, X_inst, y_inst, x_test, y_test,
                                    instrument, 128, 50, model_file_path)
 

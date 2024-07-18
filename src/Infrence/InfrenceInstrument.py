@@ -5,12 +5,10 @@ from collections import Counter
 from sklearn.metrics import confusion_matrix, f1_score
 from tensorflow.keras.models import load_model
 
-from Models.Instrument.ContrastiveLearning import generate_embeddings, contrastive_loss
-from Models.MixtureExperts import get_moe_prediction
-from Models.TransformerModel import PositionalEncoding, TransformerBlock, MultiHeadSelfAttention
-from main import get_model_feature
-from utility.EuclideanDistanceLayer import EuclideanDistanceLayer
-from utility.InstrumentDataset import plot_confusion_matrix, compute_mfcc, create_sliding_windows
+from src.Instrument.ContrastiveLearning import generate_embeddings
+from src.main.TransformerModel import model
+from src.main.main import get_model_feature
+from src.utility.InstrumentDataset import create_sliding_windows, compute_mfcc
 
 # Constants
 LABEL_MAPPING = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4}

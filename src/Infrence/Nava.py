@@ -8,14 +8,10 @@ from keras.saving.save import load_model
 from keras.utils import to_categorical
 from sklearn.model_selection import StratifiedKFold
 
-from Models.Instrument.InfrenceInstrument import preprocess_audio, load_files, extract_label
-from Models.Instrument.Kaggle import lr_time_based_decay
-from main import train_models, ensemble_learning
-from utility.InstrumentDataset import plot_history, process_files
-from utility.utils import balance_dataset_with_augmentation
+from src.Infrence.InfrenceInstrument import load_files, extract_label, preprocess_audio
+from src.Instrument.Kaggle import lr_time_based_decay
+from src.main.main import TIME_FRAME, MERGE_FACTOR, ensemble_learning
 
-TIME_FRAME = 1
-MERGE_FACTOR = 5
 sample_rate = 22050
 
 

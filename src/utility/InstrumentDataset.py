@@ -10,8 +10,7 @@ from sklearn.utils import resample
 from tqdm import tqdm
 
 import librosa
-
-from utility.utils import balance_dataset_with_augmentation, create_label_mapping, convert_labels_to_indices
+from src.utility.utils import balance_dataset_with_augmentation
 
 
 def load_signal(file_path, SAMPLE_RATE):
@@ -62,7 +61,7 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop
     print(classes)
     for i, instrument in enumerate(classes):
         print(instrument)
-        # files = os.listdir(os.path.join(dataset_path, str(instrument)))
+        # files = os.listdir(os.path.join(dataset_path, str(Instrument)))
         files = get_files(instrument, folder)
         files.sort()
         process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y, i,
@@ -80,7 +79,7 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop
 
 
 def separate_and_balance_data(X, y, instruments):
-    """Separate and balance data for each instrument."""
+    """Separate and balance data for each Instrument."""
     instrument_data = {}
     if y.ndim > 1:
         y_labels = np.argmax(y, axis=1)
@@ -88,7 +87,7 @@ def separate_and_balance_data(X, y, instruments):
         y_labels = y
 
     for y_label in np.unique(y_labels):
-        # Binary labels: 1 for the instrument, 0 for others
+        # Binary labels: 1 for the Instrument, 0 for others
         y_binary = (y_labels == y_label).astype(int)
 
         # Separate the positive and negative classes
@@ -173,10 +172,23 @@ def compute_mfcc(signal, sample_rate, n_mfcc, n_fft, hop_length):
     # print(tonnetz.shape)
 
     spectrogram = extract_spectrogram(signal, sample_rate, n_mels=64)
+    # save_spectrogram_image( spectrogram, 3)
 
     # Combine all features into a single array
     # features = np.concatenate([chromagram, spectral_contrast])
     return spectrogram.T
+
+
+def save_spectrogram_image(spectrogram, save_path):
+    plt.figure(figsize=(10, 4))
+    plt.imshow(spectrogram, aspect='auto', origin='lower', cmap='jet')
+    plt.colorbar(format='%+2.0f dB')
+    plt.title('Mel Spectrogram')
+    plt.xlabel('Time')
+    plt.ylabel('Frequency')
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
 
 
 def extract_spectrogram(y, sr, n_fft=2048, hop_length=512, n_mels=64):
