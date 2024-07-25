@@ -11,7 +11,10 @@ from sklearn.utils import class_weight
 from tcn import TCN
 from tensorflow.keras import Sequential, callbacks, layers, regularizers, models
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
+from tensorflow import keras
 
+from src.Instrument.Contrastive import create_encoder, add_projection_head, learning_rate, SupervisedContrastiveLoss, \
+    create_classifier
 from src.Instrument.ContrastiveLearning import generate_pairs, create_base_network, contrastive_loss, \
     generate_embeddings
 from src.utility.EuclideanDistanceLayer import EuclideanDistanceLayer
@@ -257,7 +260,7 @@ def build_tcn_model(input_shape, num_classes, kernel_size=3, nb_filters=64, dila
     return model
 
 
-def train_contrastive_model(x, y):
+def train_contrastive_model(x, y, num_classes):
     """ Train Siamese network using contrastive learning """
     n_splits = 5
     if y.ndim > 1:
@@ -272,40 +275,46 @@ def train_contrastive_model(x, y):
         x_train, x_test = x[train_index], x[test_index]
         y_train, y_test = y_labels[train_index], y_labels[test_index]
 
-        pairs_train, labels_train = generate_pairs(x_train, y_train)
-        pairs_test, labels_test = generate_pairs(x_test, y_test)
-
-        input_shape = x_train.shape[1:]
-        base_network = create_base_network(input_shape)
-
-        input_a = Input(shape=input_shape)
-        input_b = Input(shape=input_shape)
-
-        feat_a = base_network(input_a)
-        feat_b = base_network(input_b)
-
-        distance = EuclideanDistanceLayer()([feat_a, feat_b])
-
-        model = Model(inputs=[input_a, input_b], outputs=distance)
-
-        model.compile(loss=contrastive_loss, optimizer='adam')
-
-        model_checkpoint_path = f'model_best_Siamese_{fold_no}.keras'
+        model_checkpoint_path = f'model_best_encoder_{fold_no}.keras'
+        model_path = f'model_best_classifier_{fold_no}.keras'
         model_checkpoint_callback = ModelCheckpoint(
             filepath=model_checkpoint_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
+        model_callback = ModelCheckpoint(
+            filepath=model_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
 
-        # y_t = y.ravel()  # Flatten the array to 1D
-        # class_weights = compute_class_weight('balanced', classes=np.unique(y), y=y_t)
-        # class_weights_dict = dict(enumerate(class_weights))
+        temperature = 0.05
+        num_epochs = 100
+        batch_size = 16
 
-        history = model.fit(
-            [pairs_train[:, 0], pairs_train[:, 1]], labels_train,
-            validation_data=([pairs_test[:, 0], pairs_test[:, 1]], labels_test),
-            batch_size=64,
-            epochs=200,
-            callbacks=[model_checkpoint_callback],
-            # class_weight=class_weights_dict
-        )
+        # encoder = create_encoder()
+        #
+        # encoder_with_projection_head = add_projection_head(encoder)
+        # encoder_with_projection_head.compile(
+        #     optimizer=keras.optimizers.Adam(learning_rate),
+        #     loss=SupervisedContrastiveLoss(temperature),
+        # )
+        #
+        # encoder_with_projection_head.summary()
+        #
+        # history = encoder_with_projection_head.fit(
+        #     x=x_train, y=y_train, batch_size=batch_size, validation_data=(x_test, y_test), epochs=num_epochs,
+        #     callbacks=[model_checkpoint_callback]
+        # )
+
+        if fold_no < 5:
+            continue
+
+        encoder = load_model('./model_best_encoder_1.keras', custom_objects={
+            'SupervisedContrastiveLoss': SupervisedContrastiveLoss
+        })
+
+        classifier = create_classifier(encoder, num_classes, trainable=False)
+
+        history = classifier.fit(x=x_train, y=y_train, batch_size=batch_size, epochs=num_epochs,
+                                 validation_data=(x_test, y_test), callbacks=[model_callback])
+
+        accuracy = classifier.evaluate(x_test, y_test)[1]
+        print(f"Test accuracy: {round(accuracy * 100, 2)}%")
 
         histories.append(history)
         fold_no += 1
@@ -319,7 +328,7 @@ def evaluate_contrastive_model(x, y, classes):
     model = load_model(model_path, custom_objects={'contrastive_loss': contrastive_loss,
                                                    'EuclideanDistanceLayer': EuclideanDistanceLayer})
 
-    embeddings = generate_embeddings(model, x, 'model')
+    embeddings = generate_embeddings(model, x, 'model_1')
 
     # Split data
     x_train, x_test, y_train, y_test = train_test_split(embeddings, y, test_size=0.2, random_state=42)
@@ -327,12 +336,12 @@ def evaluate_contrastive_model(x, y, classes):
     # Define classifier model
 
     # Train classifier
-    input_shape = (embeddings.shape[1],)
+    input_shape = embeddings.shape[1]
     num_classes = y.shape[1]
     model_checkpoint_path = 'model_best_contrastive_1.keras'
     model_checkpoint_callback = callbacks.ModelCheckpoint(
         filepath=model_checkpoint_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
-    classifier_model = create_classifier_model(input_shape, num_classes)
+    classifier_model = create_classifier_model(input_shape, num_classes, [128, 64, 32])
     classifier_model.summary()
     history = classifier_model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=200, batch_size=32,
                                    callbacks=[model_checkpoint_callback])

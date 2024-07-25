@@ -9,7 +9,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from tcn import tcn_full_summary
 
 from src.Instrument.Kaggle import cnn_model, lr_time_based_decay, build_tcn_model, create_classifier_model, \
-    cnn_model_binary
+    cnn_model_binary, train_contrastive_model
 from src.Instrument.MixtureExperts import generate_performance_labels, train
 from src.main.TransformerModel import build_transformer_model
 from src.utility import InstrumentDataset
@@ -17,7 +17,7 @@ from src.utility.InstrumentDataset import plot_confusion_matrix, separate_and_ba
 from src.utility.utils import test_gpu, sanitize_file_name
 
 TIME_FRAME = 1
-MERGE_FACTOR = 1
+MERGE_FACTOR = 2
 
 # Initialize GPU configuration
 test_gpu()
@@ -203,20 +203,19 @@ def expert_training(x, y, classes, models):
 def main():
     x, y, classes = load_data()
     # histories = train_models(x, y)
-    # histories = train_contrastive_model(x, y)
+    # histories = train_contrastive_model(x, y, len(classes))
     # Structure of the 2-seconds model
     # models = [load_model('./model_best_CNN_6.h5'), load_model('./model_best_CNN_7.h5'),
     #           load_model('./model_best_CNN_10.h5'), load_model('./model_best_CNN_8.h5'),
     #           load_model('./model_best_CNN_9.h5')]
-    models = [load_model('./model_best_CNN_1.h5'), load_model('./model_best_CNN_2.h5'),
-              load_model('./model_best_CNN_3.h5'), load_model('./model_best_CNN_4.h5'),
-              load_model('./model_best_CNN_5.h5')]
+    models = [load_model('./model_best_classifier_1.keras'), load_model('./model_best_classifier_2.keras'),
+              load_model('./model_best_classifier_3.keras'), load_model('./model_best_classifier_4.keras'),
+              load_model('./model_best_classifier_5.keras')]
     ensemble_learning(x, y, models)
     # expert_training(x, y, classes, models)
 
     # for history in histories:
     #     plot_history(history)
-    # evaluate_contrastive_model(x, y, classes)
     # evaluate_combined_contrastive_model(x, y, classes)
 
 

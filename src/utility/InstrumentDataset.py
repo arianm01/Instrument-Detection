@@ -330,7 +330,7 @@ def get_meta_features(models, X, chunk_size=44):
     chunks = split_into_chunks(X, chunk_size)
     all_features = []
     num_segments = chunks[0].shape[0]
-    chunk_size = 20
+    chunk_size = 80
     for chunk in chunks:
         chunk_pred = []
         for start in range(0, num_segments, chunk_size):

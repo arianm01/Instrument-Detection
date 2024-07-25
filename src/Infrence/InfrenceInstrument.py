@@ -21,14 +21,14 @@ All_CLASSES = ['Daf', 'Divan', 'Dutar', 'Gheychak', 'Kamancheh', 'Ney', 'Ney Anb
 def load_files(audio_path):
     """Loads the list of files to process."""
     try:
-        with open(audio_path + '/dev_original.txt', 'r') as file:
+        with open(audio_path + '/test.txt', 'r') as file:
             return [line.strip() for line in file.readlines()]
     except FileNotFoundError:
         print("File not found.")
         return []
 
 
-def preprocess_audio(audio_path, segment_duration=1, n_mfcc=13, step_size=None):
+def preprocess_audio(audio_path, segment_duration=5, n_mfcc=13, step_size=None):
     """Preprocesses the audio file into MFCC segments."""
     try:
         if step_size is not None:
@@ -195,14 +195,16 @@ def display_f1_scores(f1_scores, macro_f1_score):
 def main():
     audio_path = '../../../../archive/NavaDataset'
     files = load_files(audio_path)
-    models_addr = ['./Finetune/model_best_CNN_1.h5', './Finetune/model_best_CNN_2.h5', './Finetune/model_best_CNN_3.h5',
-                   './Finetune/model_best_CNN_4.h5', './Finetune/model_best_CNN_5.h5']
-    model, models, model_base = load_models('../../model_best_CNN_2.h5', models_addr,
+    models_addr = ['../../model_best_classifier_1.keras', '../../model_best_classifier_2.keras',
+                   '../../model_best_classifier_3.keras', '../../model_best_classifier_4.keras',
+                   '../../model_best_classifier_5.keras']
+    model, models, model_base = load_models('../../ensemble.keras', models_addr,
                                             '../../output/2 seconds/mixture_ensemble.keras')
     contrastive = False
 
     true_labels, predicted_labels = process_files(files, audio_path, model, models, model_base, contrastive)
     evaluate_predictions(true_labels, predicted_labels)
 
-    if __name__ == "__main__":
-        main()
+
+if __name__ == "__main__":
+    main()
