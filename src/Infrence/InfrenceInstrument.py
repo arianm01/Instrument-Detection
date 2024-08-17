@@ -2,9 +2,10 @@ import os
 import librosa
 import numpy as np
 from collections import Counter
-from sklearn.metrics import confusion_matrix, f1_score
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 from tensorflow.keras.models import load_model
 
+from src.Instrument.Contrastive import SupervisedContrastiveLoss
 from src.Instrument.ContrastiveLearning import generate_embeddings
 from src.main.TransformerModel import model
 from src.main.main import get_model_feature
@@ -28,7 +29,7 @@ def load_files(audio_path):
         return []
 
 
-def preprocess_audio(audio_path, segment_duration=5, n_mfcc=13, step_size=None):
+def preprocess_audio(audio_path, segment_duration=1, n_mfcc=13, step_size=None):
     """Preprocesses the audio file into MFCC segments."""
     try:
         if step_size is not None:
@@ -67,8 +68,7 @@ def predict_segments(segments, model, models, model_base, contrastive=False):
         else:
             meta = get_model_feature(segments, models)
             predictions = model.predict(meta)
-            # predictions = get_moe_prediction(segments, models, model_base, chunk_size=44)
-            # predictions = model.predict(segments)
+            # predictions = model_base.predict(segments)
         return np.argmax(predictions, axis=1)
     except Exception as e:
         print(f"Error during prediction: {str(e)}")
@@ -103,9 +103,11 @@ def load_models(addr_model, addr_models, addr_model_base):
     model = load_model(addr_model)
     models = [load_model(addr_models[0]), load_model(addr_models[1]), load_model(addr_models[2]),
               load_model(addr_models[3]), load_model(addr_models[4])]
-    # model_base = load_model(addr_model_base)
+    model_base = load_model(addr_model_base, custom_objects={
+        'SupervisedContrastiveLoss': SupervisedContrastiveLoss
+    })
     # models = []
-    model_base = 2
+    # model_base = 2
     return model, models, model_base
 
 
@@ -127,7 +129,7 @@ def process_files(files, audio_path, model, models, model_base, contrastive=Fals
 
 
 def display_predictions(file, predicted_label):
-    """Displays the prediction results."""
+    """Displays the prediction results.txt."""
     if predicted_label.size > 0:
         label_counts = Counter(predicted_label)
         for label, count in label_counts.items():
@@ -140,7 +142,8 @@ def display_predictions(file, predicted_label):
 def evaluate_predictions(true_labels, predicted_labels):
     """Evaluates and prints the prediction performance metrics."""
     true_labels = [int(x) for x in true_labels]
-    print(true_labels, predicted_labels)
+    print("True Labels:", true_labels)
+    print("Predicted Labels:", predicted_labels)
 
     conf_matrix = confusion_matrix(true_labels, predicted_labels)
     print('Confusion matrix \n', conf_matrix)
@@ -154,14 +157,20 @@ def evaluate_predictions(true_labels, predicted_labels):
     f1_scores = f1_score(true_labels, predicted_labels, average=None)
     macro_f1_score = f1_score(true_labels, predicted_labels, average='weighted')
 
+    precision_scores = precision_score(true_labels, predicted_labels, average=None)
+    macro_precision_score = precision_score(true_labels, predicted_labels, average='weighted')
+
+    recall_scores = recall_score(true_labels, predicted_labels, average=None)
+    macro_recall_score = recall_score(true_labels, predicted_labels, average='weighted')
+
     display_f1_scores(f1_scores, macro_f1_score)
+    display_precision_recall(precision_scores, recall_scores, macro_precision_score, macro_recall_score)
 
 
 def calculate_class_accuracies(conf_matrix):
     """Calculates accuracies for each class."""
     class_accuracies = {}
-    # for i, class_label in enumerate(LABEL_MAPPING.values()):
-    for i, class_label in enumerate(All_LABEL_MAPPING.values()):
+    for i, class_label in enumerate(LABEL_MAPPING.values()):
         true_positives = conf_matrix[i, i]
         total_predictions = conf_matrix[:, i].sum()
         accuracy = true_positives / total_predictions if total_predictions > 0 else 0
@@ -172,8 +181,7 @@ def calculate_class_accuracies(conf_matrix):
 def display_class_accuracies(class_accuracies):
     """Displays accuracies for each class."""
     for label, acc in class_accuracies.items():
-        # print(f"Accuracy for class {CLASSES[label]}: {acc * 100:.2f}%")
-        print(f"Accuracy for class {All_CLASSES[label]}: {acc * 100:.2f}%")
+        print(f"Accuracy for class {CLASSES[label]}: {acc * 100:.2f}%")
 
 
 def calculate_overall_accuracy(conf_matrix):
@@ -185,21 +193,30 @@ def calculate_overall_accuracy(conf_matrix):
 
 def display_f1_scores(f1_scores, macro_f1_score):
     """Displays F1 scores for each class and the macro-average F1 score."""
-    # for i, label in enumerate(LABEL_MAPPING.values()):
-    #     print(f"F1 Score for class {CLASSES[label]}: {f1_scores[i]:.2f}")
-    for i, label in enumerate(All_LABEL_MAPPING.values()):
-        print(f"F1 Score for class {All_CLASSES[label]}: {f1_scores[i]:.2f}")
+    for i, label in enumerate(LABEL_MAPPING.values()):
+        print(f"F1 Score for class {CLASSES[label]}: {f1_scores[i]:.2f}")
     print(f"Macro-average F1 Score: {macro_f1_score:.2f}")
+
+
+def display_precision_recall(precision_scores, recall_scores, macro_precision_score, macro_recall_score):
+    """Displays precision and recall scores for each class and the macro-average scores."""
+    for i, label in enumerate(LABEL_MAPPING.values()):
+        print(f"Precision for class {CLASSES[label]}: {precision_scores[i]:.2f}")
+        print(f"Recall for class {CLASSES[label]}: {recall_scores[i]:.2f}")
+    print(f"Macro-average Precision: {macro_precision_score:.2f}")
+    print(f"Macro-average Recall: {macro_recall_score:.2f}")
 
 
 def main():
     audio_path = '../../../../archive/NavaDataset'
+    path = '../main/ensemble.keras'
     files = load_files(audio_path)
-    models_addr = ['../../model_best_classifier_1.keras', '../../model_best_classifier_2.keras',
-                   '../../model_best_classifier_3.keras', '../../model_best_classifier_4.keras',
-                   '../../model_best_classifier_5.keras']
-    model, models, model_base = load_models('../../ensemble.keras', models_addr,
-                                            '../../output/2 seconds/mixture_ensemble.keras')
+    models_addr = ['../../output/5 class/CNN/1 second/model_best_CNN_8.h5',
+                   '../../output/5 class/CNN/1 second/model_best_CNN_9.h5',
+                   '../../output/5 class/CNN/1 second/model_best_CNN_10.h5',
+                   '../../output/5 class/Contrastive/1 sec/model_best_classifier_4.keras',
+                   '../../output/5 class/Contrastive/1 sec/model_best_classifier_5.keras']
+    model, models, model_base = load_models(path, models_addr, models_addr[3])
     contrastive = False
 
     true_labels, predicted_labels = process_files(files, audio_path, model, models, model_base, contrastive)

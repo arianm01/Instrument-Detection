@@ -1,9 +1,7 @@
-from keras import layers
+from keras import layers, Sequential, Input, models
 from tensorflow import keras
 import tensorflow as tf
 import tensorflow_addons as tfa
-
-INPUT_SHAPE = (44, 64, 1)
 
 
 class SupervisedContrastiveLoss(keras.losses.Loss):
@@ -29,8 +27,8 @@ class SupervisedContrastiveLoss(keras.losses.Loss):
         return config
 
 
-def add_projection_head(encoder):
-    inputs = keras.Input(shape=INPUT_SHAPE)
+def add_projection_head(encoder, input_shape):
+    inputs = keras.Input(shape=input_shape)
     features = encoder(inputs)
     outputs = layers.Dense(projection_units, activation="relu")(features)
     model = keras.Model(
@@ -39,42 +37,61 @@ def add_projection_head(encoder):
     return model
 
 
-def create_encoder():
-    resnet = keras.applications.ResNet50V2(
-        include_top=False, weights=None, input_shape=INPUT_SHAPE, pooling="avg"
-    )
+def create_encoder(layer_sizes, input_shape):
+    # resnet = keras.applications.ResNet50V2(
+    #     include_top=False, weights=None, input_shape=INPUT_SHAPE, pooling="avg"
+    # )
+    #
+    # inputs = keras.Input(shape=INPUT_SHAPE)
+    # outputs = resnet(inputs)
+    # model = keras.Model(inputs=inputs, outputs=outputs, name="cifar10-encoder")
 
-    inputs = keras.Input(shape=INPUT_SHAPE)
-    outputs = resnet(inputs)
-    model = keras.Model(inputs=inputs, outputs=outputs, name="cifar10-encoder")
+    model = Sequential()
+    model.add(layers.Conv2D(layer_sizes[0], (3, 3), input_shape=input_shape, activation='relu', padding='same'))
+    model.add(layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same'))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Dropout(0.3))
+
+    for size in layer_sizes[1:]:
+        model.add(layers.Conv2D(size, (3, 3), activation='relu', padding='same'))
+        model.add(layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same'))
+        model.add(layers.BatchNormalization())
+        model.add(layers.Dropout(0.3))
+
+    model.add(layers.Flatten())
+    model.add(layers.Dense(512, activation='relu'))
+    model.add(layers.Dropout(0.3))
+    model.add(layers.Dense(256, activation='relu'))
+
     return model
 
 
-def create_classifier(encoder, num_output, trainable=True):
+def create_classifier(encoder, num_output, input_shape, trainable=True):
     for layer in encoder.layers:
         layer.trainable = trainable
 
-    inputs = keras.Input(shape=INPUT_SHAPE)
+    inputs = keras.Input(shape=input_shape)
     features = encoder(inputs)
     features = layers.Dropout(dropout_rate)(features)
-    features = layers.Dense(512, activation="relu")(features)
+    features = layers.Dense(256, activation="relu")(features)
     features = layers.Dropout(dropout_rate)(features)
     features = layers.Dense(hidden_units, activation="relu")(features)
     features = layers.Dropout(dropout_rate)(features)
-    features = layers.Dense(128, activation="relu")(features)
+    features = layers.Dense(64, activation="relu")(features)
+    features = layers.Dropout(dropout_rate)(features)
+    features = layers.Dense(32, activation="relu")(features)
     features = layers.Dropout(dropout_rate)(features)
     outputs = layers.Dense(num_output, activation="softmax")(features)
 
     model = keras.Model(inputs=inputs, outputs=outputs, name="cifar10-classifier")
     model.compile(
+        loss='categorical_crossentropy', metrics=['accuracy'],
         optimizer=keras.optimizers.Adam(learning_rate),
-        loss=keras.losses.SparseCategoricalCrossentropy(),
-        metrics=[keras.metrics.SparseCategoricalAccuracy()],
     )
     return model
 
 
 learning_rate = 0.001
-hidden_units = 256
-projection_units = 1024
-dropout_rate = 0.5
+hidden_units = 128
+projection_units = 128
+dropout_rate = 0.4

@@ -56,23 +56,23 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop
     """
     x, y = [], []
     sample_rate = 22050
-    # classes = ['Tar', 'Kamancheh', 'Santur', 'Setar', 'Ney']
-    classes = os.listdir(dataset_path)
+    classes = ['Tar', 'Kamancheh', 'Santur', 'Setar', 'Ney']
+    # classes = os.listdir(dataset_path)
     print(classes)
     for i, instrument in enumerate(classes):
         print(instrument)
-        # files = os.listdir(os.path.join(dataset_path, str(Instrument)))
         files = get_files(instrument, folder)
         files.sort()
         process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y, i,
                       duration * merge_factor * sample_rate, int(duration * sample_rate))
 
     y = np.array(y)
+    x = np.array(x)
 
     target_count = max(np.bincount(y))  # Adjust target count as needed
     print(target_count)
     if balance_needed:
-        x, y = balance_dataset_with_augmentation(np.array(x), y, 22050, target_count)
+        x, y = balance_dataset_with_augmentation(x, y, 22050, target_count)
     y = np.array(pd.get_dummies(y))
     print(x[0], len(y))
     return x, y, classes
@@ -115,6 +115,9 @@ def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfc
     for i, file in enumerate(tqdm(files)):
         file_path = os.path.join(dataset_path, instrument, file)
         signal, sample_rate = librosa.load(file_path, duration=duration)
+
+        # if i > 10800:
+        #     break
 
         if not contains(file, last_file[:-9]):
             # Process the accumulated base_signal
@@ -206,14 +209,14 @@ def plot_history(history):
 
     # create accuracy sublpot
     axs[0].plot(history.history["accuracy"], label="train accuracy")
-    axs[0].plot(history.history["val_accuracy"], label="test accuracy")
+    axs[0].plot(history.history["val_accuracy"], label="Contrastive accuracy")
     axs[0].set_ylabel("Accuracy")
     axs[0].legend(loc="lower right")
     axs[0].set_title("Accuracy eval")
 
     # create error sublpot
     axs[1].plot(history.history["loss"], label="train error")
-    axs[1].plot(history.history["val_loss"], label="test error")
+    axs[1].plot(history.history["val_loss"], label="Contrastive error")
     axs[1].set_ylabel("Error")
     axs[1].set_xlabel("Epoch")
     axs[1].legend(loc="upper right")
@@ -330,7 +333,7 @@ def get_meta_features(models, X, chunk_size=44):
     chunks = split_into_chunks(X, chunk_size)
     all_features = []
     num_segments = chunks[0].shape[0]
-    chunk_size = 80
+    chunk_size = 100
     for chunk in chunks:
         chunk_pred = []
         for start in range(0, num_segments, chunk_size):

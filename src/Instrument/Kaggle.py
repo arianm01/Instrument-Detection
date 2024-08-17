@@ -12,6 +12,7 @@ from tcn import TCN
 from tensorflow.keras import Sequential, callbacks, layers, regularizers, models
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from tensorflow import keras
+import tensorflow as tf
 
 from src.Instrument.Contrastive import create_encoder, add_projection_head, learning_rate, SupervisedContrastiveLoss, \
     create_classifier
@@ -274,44 +275,49 @@ def train_contrastive_model(x, y, num_classes):
     for fold_no, (train_index, test_index) in enumerate(skf.split(x, y_labels), start=1):
         x_train, x_test = x[train_index], x[test_index]
         y_train, y_test = y_labels[train_index], y_labels[test_index]
+        batch_size = 4
+
+        train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+        train_dataset = train_dataset.batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
 
         model_checkpoint_path = f'model_best_encoder_{fold_no}.keras'
         model_path = f'model_best_classifier_{fold_no}.keras'
-        model_checkpoint_callback = ModelCheckpoint(
-            filepath=model_checkpoint_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
+        model_checkpoint_callback = ModelCheckpoint(filepath=model_checkpoint_path, save_best_only=True,
+                                                    monitor='val_loss', mode='min', verbose=1)
         model_callback = ModelCheckpoint(
             filepath=model_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
+        early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
+        input_shape = (x_train.shape[1], x_train.shape[2], 1)
         temperature = 0.05
         num_epochs = 100
-        batch_size = 16
 
-        # encoder = create_encoder()
-        #
-        # encoder_with_projection_head = add_projection_head(encoder)
-        # encoder_with_projection_head.compile(
-        #     optimizer=keras.optimizers.Adam(learning_rate),
-        #     loss=SupervisedContrastiveLoss(temperature),
-        # )
-        #
-        # encoder_with_projection_head.summary()
-        #
-        # history = encoder_with_projection_head.fit(
-        #     x=x_train, y=y_train, batch_size=batch_size, validation_data=(x_test, y_test), epochs=num_epochs,
-        #     callbacks=[model_checkpoint_callback]
-        # )
-
-        if fold_no < 5:
+        if fold_no < 2:
             continue
+        layer_sizes = [512, 256, 128, 64]
 
-        encoder = load_model('./model_best_encoder_1.keras', custom_objects={
-            'SupervisedContrastiveLoss': SupervisedContrastiveLoss
-        })
+        encoder = create_encoder(layer_sizes, input_shape)
 
-        classifier = create_classifier(encoder, num_classes, trainable=False)
+        encoder_with_projection_head = add_projection_head(encoder, input_shape)
+        encoder_with_projection_head.compile(optimizer=keras.optimizers.Adam(learning_rate),
+                                             loss=SupervisedContrastiveLoss(temperature),
+                                             )
+
+        encoder_with_projection_head.summary()
+
+        encoder_with_projection_head.fit(
+            train_dataset, batch_size=batch_size, validation_data=(x_test, y_test), epochs=num_epochs,
+            callbacks=[model_checkpoint_callback, early_stopping]
+        )
+
+        # encoder = load_model('./model_best_encoder_1.keras', custom_objects={
+        #     'SupervisedContrastiveLoss': SupervisedContrastiveLoss
+        # }).layers[1]
+
+        classifier = create_classifier(encoder, num_classes, input_shape, trainable=False)
 
         history = classifier.fit(x=x_train, y=y_train, batch_size=batch_size, epochs=num_epochs,
-                                 validation_data=(x_test, y_test), callbacks=[model_callback])
+                                 validation_data=(x_test, y_test), callbacks=[model_callback, early_stopping])
 
         accuracy = classifier.evaluate(x_test, y_test)[1]
         print(f"Test accuracy: {round(accuracy * 100, 2)}%")
@@ -323,7 +329,7 @@ def train_contrastive_model(x, y, num_classes):
 
 
 def evaluate_contrastive_model(x, y, classes):
-    """ Evaluate Siamese network on a separate test set """
+    """ Evaluate Siamese network on a separate Contrastive set """
     model_path = 'model_best_Siamese_1.keras'  # Adjust the path as necessary
     model = load_model(model_path, custom_objects={'contrastive_loss': contrastive_loss,
                                                    'EuclideanDistanceLayer': EuclideanDistanceLayer})

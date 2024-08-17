@@ -14,11 +14,13 @@ def main():
 
     x, y, _ = InstrumentDataset.read_data(audio_path, MERGE_FACTOR, TIME_FRAME,
                                           folder='../../Models/Instrument/splits/test', balance_needed=False)
-    model, models, model_base = load_models('../../ensemble.keras', ['../../model_best_CNN_1.h5',
-                                                                     '../../model_best_CNN_2.h5',
-                                                                     '../../model_best_CNN_3.h5',
-                                                                     '../../model_best_CNN_4.h5',
-                                                                     '../../model_best_CNN_5.h5'], '')
+    models_addr = ['../../output/5 class/CNN/5 seconds/model_best_CNN_1.h5',
+                   '../../output/5 class/CNN/5 seconds/model_best_CNN_5.h5',
+                   '../../output/5 class/CNN/5 seconds/model_best_CNN_6.h5',
+                   '../../output/5 class/CNN/5 seconds/model_best_CNN_8.h5',
+                   '../../output/5 class/CNN/5 seconds/model_best_CNN_9.h5']
+    model, models, model_base = load_models('../../output/5 class/CNN/10 seconds/ensemble.keras', models_addr,
+                                            models_addr[0])
 
     x = np.array(x)
     x = x[..., np.newaxis]
