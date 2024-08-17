@@ -7,7 +7,7 @@ from src.Instrument.ContrastiveLearning import contrastive_loss
 
 
 def main():
-    path = '../../output/5 class/Contrastive/5 sec/model_best_classifier_2.keras'
+    path = '../../output/5 class/Contrastive/1 sec/model_best_classifier_1.keras'
     # files = os.listdir(path)
 
     # for file in files:

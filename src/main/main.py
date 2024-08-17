@@ -18,7 +18,7 @@ from src.utility.InstrumentDataset import plot_confusion_matrix, separate_and_ba
 from src.utility.utils import test_gpu, sanitize_file_name
 
 TIME_FRAME = 1
-MERGE_FACTOR = 1
+MERGE_FACTOR = 2
 
 # Initialize GPU configuration
 test_gpu()
