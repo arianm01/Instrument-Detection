@@ -275,52 +275,49 @@ def train_contrastive_model(x, y, num_classes):
     for fold_no, (train_index, test_index) in enumerate(skf.split(x, y_labels), start=1):
         x_train, x_test = x[train_index], x[test_index]
         y_train, y_test = y_labels[train_index], y_labels[test_index]
-        batch_size = 4
-
-        train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
-        train_dataset = train_dataset.batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
+        y_tr, y_te = y[train_index], y[test_index]
+        batch_size = 32
 
         model_checkpoint_path = f'model_best_encoder_{fold_no}.keras'
         model_path = f'model_best_classifier_{fold_no}.keras'
         model_checkpoint_callback = ModelCheckpoint(filepath=model_checkpoint_path, save_best_only=True,
                                                     monitor='val_loss', mode='min', verbose=1)
+        lr_scheduler = callbacks.LearningRateScheduler(lr_time_based_decay, verbose=1)
         model_callback = ModelCheckpoint(
             filepath=model_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
         early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
         input_shape = (x_train.shape[1], x_train.shape[2], 1)
-        temperature = 0.05
+        temperature = 0.1
         num_epochs = 100
 
-        if fold_no < 2:
-            continue
-        layer_sizes = [512, 256, 128, 64]
+        # if fold_no > 2:
+        #     continue
+        layer_sizes = [256, 128, 64, 32, 16]
 
         encoder = create_encoder(layer_sizes, input_shape)
 
         encoder_with_projection_head = add_projection_head(encoder, input_shape)
         encoder_with_projection_head.compile(optimizer=keras.optimizers.Adam(learning_rate),
-                                             loss=SupervisedContrastiveLoss(temperature),
-                                             )
+                                             loss=SupervisedContrastiveLoss(temperature))
 
         encoder_with_projection_head.summary()
 
-        encoder_with_projection_head.fit(
-            train_dataset, batch_size=batch_size, validation_data=(x_test, y_test), epochs=num_epochs,
-            callbacks=[model_checkpoint_callback, early_stopping]
-        )
-
-        # encoder = load_model('./model_best_encoder_1.keras', custom_objects={
-        #     'SupervisedContrastiveLoss': SupervisedContrastiveLoss
-        # }).layers[1]
+        encoder_with_projection_head.fit(x=x_train, y=y_train, batch_size=batch_size,
+                                         validation_data=(x_test, y_test),
+                                         epochs=num_epochs,
+                                         callbacks=[model_checkpoint_callback, early_stopping, lr_scheduler])
+        # encoder = load_model(f'./model_best_encoder_{fold_no}.keras', custom_objects={
+        #     'SupervisedContrastiveLoss': SupervisedContrastiveLoss}).layers[1]
 
         classifier = create_classifier(encoder, num_classes, input_shape, trainable=False)
 
-        history = classifier.fit(x=x_train, y=y_train, batch_size=batch_size, epochs=num_epochs,
-                                 validation_data=(x_test, y_test), callbacks=[model_callback, early_stopping])
+        history = classifier.fit(x=x_train, y=y_tr, batch_size=batch_size, epochs=num_epochs,
+                                 validation_data=(x_test, y_te),
+                                 callbacks=[model_callback, early_stopping, lr_scheduler])
 
-        accuracy = classifier.evaluate(x_test, y_test)[1]
-        print(f"Test accuracy: {round(accuracy * 100, 2)}%")
+        # accuracy = classifier.evaluate(x_test, y_test)[1]
+        # print(f"Test accuracy: {round(accuracy * 100, 2)}%")
 
         histories.append(history)
         fold_no += 1
