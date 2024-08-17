@@ -18,7 +18,7 @@ from src.utility.InstrumentDataset import plot_confusion_matrix, separate_and_ba
 from src.utility.utils import test_gpu, sanitize_file_name
 
 TIME_FRAME = 1
-MERGE_FACTOR = 2
+MERGE_FACTOR = 1
 
 # Initialize GPU configuration
 test_gpu()
@@ -209,12 +209,10 @@ def main():
     # models = [load_model('./model_best_CNN_6.h5'), load_model('./model_best_CNN_7.h5'),
     #           load_model('./model_best_CNN_10.h5'), load_model('./model_best_CNN_8.h5'),
     #           load_model('./model_best_CNN_9.h5')]
-    # models = [load_model('../../output/5 class/Contrastive/1 sec/model_best_classifier_1.keras'),
-    #           load_model('../../output/5 class/Contrastive/1 sec/model_best_classifier_2.keras'),
-    #           load_model('../../output/5 class/Contrastive/1 sec/model_best_classifier_3.keras'),
-    #           load_model('../../output/5 class/Contrastive/1 sec/model_best_classifier_4.keras'),
-    #           load_model('../../output/5 class/Contrastive/1 sec/model_best_classifier_5.keras')]
-    # ensemble_learning(x, y, models)
+    models = [load_model('./model_best_classifier_1.keras'), load_model('./model_best_classifier_2.keras'),
+              load_model('./model_best_classifier_3.keras'), load_model('./model_best_classifier_4.keras'),
+              load_model('./model_best_classifier_5.keras')]
+    ensemble_learning(x, y, models)
     # expert_training(x, y, classes, models)
 
     # for history in histories:

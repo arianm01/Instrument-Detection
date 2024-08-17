@@ -29,7 +29,7 @@ def load_files(audio_path):
         return []
 
 
-def preprocess_audio(audio_path, segment_duration=2, n_mfcc=13, step_size=None):
+def preprocess_audio(audio_path, segment_duration=1, n_mfcc=13, step_size=None):
     """Preprocesses the audio file into MFCC segments."""
     try:
         if step_size is not None:
@@ -211,12 +211,12 @@ def main():
     audio_path = '../../../../archive/NavaDataset'
     path = '../main/ensemble.keras'
     files = load_files(audio_path)
-    models_addr = ['../../output/5 class/Contrastive/1 sec/model_best_classifier_1.keras',
-                   '../../output/5 class/Contrastive/1 sec/model_best_classifier_2.keras',
-                   '../../output/5 class/Contrastive/1 sec/model_best_classifier_3.keras',
+    models_addr = ['../../output/5 class/CNN/1 second/model_best_CNN_8.h5',
+                   '../../output/5 class/CNN/1 second/model_best_CNN_9.h5',
+                   '../../output/5 class/CNN/1 second/model_best_CNN_10.h5',
                    '../../output/5 class/Contrastive/1 sec/model_best_classifier_4.keras',
                    '../../output/5 class/Contrastive/1 sec/model_best_classifier_5.keras']
-    model, models, model_base = load_models(path, models_addr, models_addr[4])
+    model, models, model_base = load_models(path, models_addr, models_addr[3])
     contrastive = False
 
     true_labels, predicted_labels = process_files(files, audio_path, model, models, model_base, contrastive)

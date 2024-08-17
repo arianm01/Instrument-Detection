@@ -47,7 +47,7 @@ def create_encoder(layer_sizes, input_shape):
     # model = keras.Model(inputs=inputs, outputs=outputs, name="cifar10-encoder")
 
     model = Sequential()
-    model.add(layers.Conv2D(layer_sizes[0], (3, 3), activation='relu', input_shape=input_shape, padding='same'))
+    model.add(layers.Conv2D(layer_sizes[0], (3, 3), input_shape=input_shape, activation='relu', padding='same'))
     model.add(layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same'))
     model.add(layers.BatchNormalization())
     model.add(layers.Dropout(0.3))
@@ -59,8 +59,9 @@ def create_encoder(layer_sizes, input_shape):
         model.add(layers.Dropout(0.3))
 
     model.add(layers.Flatten())
-    model.add(layers.Dense(256, activation='relu'))
+    model.add(layers.Dense(512, activation='relu'))
     model.add(layers.Dropout(0.3))
+    model.add(layers.Dense(256, activation='relu'))
 
     return model
 
@@ -72,8 +73,8 @@ def create_classifier(encoder, num_output, input_shape, trainable=True):
     inputs = keras.Input(shape=input_shape)
     features = encoder(inputs)
     features = layers.Dropout(dropout_rate)(features)
-    # features = layers.Dense(256, activation="relu")(features)
-    # features = layers.Dropout(dropout_rate)(features)
+    features = layers.Dense(256, activation="relu")(features)
+    features = layers.Dropout(dropout_rate)(features)
     features = layers.Dense(hidden_units, activation="relu")(features)
     features = layers.Dropout(dropout_rate)(features)
     features = layers.Dense(64, activation="relu")(features)
@@ -93,4 +94,4 @@ def create_classifier(encoder, num_output, input_shape, trainable=True):
 learning_rate = 0.001
 hidden_units = 128
 projection_units = 128
-dropout_rate = 0.3
+dropout_rate = 0.4
