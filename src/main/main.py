@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import librosa
+from keras import mixed_precision
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
 from keras.models import load_model
 from keras.utils.version_utils import callbacks
@@ -33,8 +34,8 @@ def extract_features(signal, frame_size, hop_length):
 
 def load_data():
     """ Load and preprocess data """
-    x, y, classes = InstrumentDataset.read_data('./Dataset', MERGE_FACTOR, TIME_FRAME)
-    # x, y, classes = InstrumentDataset.read_data('../../archive/NavaDataset/Data/', MERGE_FACTOR, TIME_FRAME)
+    x, y, classes = InstrumentDataset.read_data('../../Dataset', MERGE_FACTOR, TIME_FRAME,
+                                                folder='../../Models/splits/train')
     print(np.array(x).shape)
     X = np.array(x)[..., np.newaxis]  # Add an extra dimension for the channels
     print(f'The shape of X is {X.shape}')
@@ -124,10 +125,10 @@ def train_meta_model(X_train, y_train, x_test, y_test, models):
     """Train meta-model using meta-features."""
     input_shape = X_train.shape[1]
 
-    model = create_classifier_model(input_shape, 15, [128, 64, 32, 16])
+    model = create_classifier_model(input_shape, 5, [256, 128, 64, 32])
     model_checkpoint_callback = callbacks.ModelCheckpoint(
         filepath='ensemble.keras', save_best_only=True, monitor='val_loss', mode='min', verbose=1)
-    model.compile(loss='categorical_crossentropy', optimizer='adam')
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
     model.summary()
     model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(x_test, y_test),
               callbacks=[model_checkpoint_callback])
@@ -203,15 +204,17 @@ def expert_training(x, y, classes, models):
 def main():
     x, y, classes = load_data()
     # histories = train_models(x, y)
-    # histories = train_contrastive_model(x, y, len(classes))
+    histories = train_contrastive_model(x, y, len(classes))
     # Structure of the 2-seconds model
     # models = [load_model('./model_best_CNN_6.h5'), load_model('./model_best_CNN_7.h5'),
     #           load_model('./model_best_CNN_10.h5'), load_model('./model_best_CNN_8.h5'),
     #           load_model('./model_best_CNN_9.h5')]
-    models = [load_model('./model_best_classifier_1.keras'), load_model('./model_best_classifier_2.keras'),
-              load_model('./model_best_classifier_3.keras'), load_model('./model_best_classifier_4.keras'),
-              load_model('./model_best_classifier_5.keras')]
-    ensemble_learning(x, y, models)
+    # models = [load_model('../../output/5 class/Contrastive/1 sec/model_best_classifier_1.keras'),
+    #           load_model('../../output/5 class/Contrastive/1 sec/model_best_classifier_2.keras'),
+    #           load_model('../../output/5 class/Contrastive/1 sec/model_best_classifier_3.keras'),
+    #           load_model('../../output/5 class/Contrastive/1 sec/model_best_classifier_4.keras'),
+    #           load_model('../../output/5 class/Contrastive/1 sec/model_best_classifier_5.keras')]
+    # ensemble_learning(x, y, models)
     # expert_training(x, y, classes, models)
 
     # for history in histories:

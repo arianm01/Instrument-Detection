@@ -112,7 +112,7 @@ def evaluate_combined_contrastive_model(x, y, classes):
 
     base_network = siamese_model.get_layer('model')  # Assuming the base network is named 'model'
 
-    # Create a new model that includes the base network and the classifier on top
+    # Create a Contrastive model that includes the base network and the classifier on top
     input_shape = x.shape[1:]
     num_classes = len(classes)
     combined_model = create_classifier_on_siamese(base_network, input_shape, num_classes)
