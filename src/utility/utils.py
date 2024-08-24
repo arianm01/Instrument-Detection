@@ -1,6 +1,7 @@
 import librosa
 import numpy as np
 import tensorflow as tf
+from keras.saving.save import load_model
 
 
 def test_gpu():
@@ -80,13 +81,13 @@ def augment_data(data, sr, label, target_count):
     return np.array(augmented_data), np.array(augmented_labels)
 
 
-def balance_dataset_with_augmentation(x, y, sr, target_count):
+def balance_dataset_with_augmentation(x, y, sr, target_count, models=None):
     unique_classes = np.unique(y)
     balanced_x = []
     balanced_y = []
 
     for cls in unique_classes:
-        class_indices = np.nonzero(y == cls)[0]
+        class_indices = np.nonzero(y == cls)[0].astype(np.int32)
         # Debug information
         print(f"Class: {cls}")
         print(f"Class Indices: {class_indices}")
@@ -100,12 +101,13 @@ def balance_dataset_with_augmentation(x, y, sr, target_count):
             augmented_data, augmented_labels = augment_data(class_data, sr, cls, target_count)
             class_data = np.concatenate((class_data, augmented_data))
             class_labels = np.concatenate((class_labels, augmented_labels))
-
-        balanced_x.append(class_data)
+        if models:
+            class_data = get_meta_features(models, class_data.astype(np.float32)[..., np.newaxis])
+        balanced_x.append(class_data.astype(np.float32))
         balanced_y.append(class_labels)
 
-    balanced_x = np.concatenate(balanced_x)
     balanced_y = np.concatenate(balanced_y)
+    balanced_x = np.concatenate(balanced_x)
 
     return balanced_x, balanced_y
 
@@ -125,3 +127,54 @@ def convert_labels_to_indices(labels, label_to_index):
 def sanitize_file_name(file_name):
     """Sanitize the file name to avoid invalid characters."""
     return "".join([c if c.isalnum() or c in (' ', '.', '_') else '_' for c in file_name])
+
+
+def split_into_chunks(X, chunk_size):
+    """Split the input array into chunks of specified size."""
+    chunks = []
+    num_samples, total_length, *rest = X.shape
+    print(X.shape)
+    num_chunks = (total_length + chunk_size - 1) // chunk_size  # Ceiling division
+    for i in range(num_chunks):
+        start = i * chunk_size
+        end = min(start + chunk_size, total_length)
+        chunk = X[:, start:end, ...]
+        # If the chunk is smaller than chunk_size, pad it with zeros
+        if end - start < chunk_size:
+            padding_shape = (num_samples, chunk_size - (end - start), *rest)
+            chunk = np.pad(chunk, [(0, 0), (0, padding_shape[1]), (0, 0), (0, 0)], mode='constant')
+        chunks.append(chunk)
+    return chunks
+
+
+def get_model_feature(x, models=None):
+    if models is None:
+        model_paths = ['./Models/model_best_Tar.h5', './Models/model_best_Kamancheh.h5',
+                       './Models/model_best_Santur.h5', './Models/model_best_Setar.h5',
+                       './Models/model_best_Ney.h5']
+        models = [load_model(model_paths[0]), load_model(model_paths[1]), load_model(model_paths[2]),
+                  load_model(model_paths[3]), load_model(model_paths[4])]
+    meta_features = get_meta_features(models, x)
+    return meta_features
+
+
+def get_meta_features(models, X, chunk_size=44):
+    """Generate meta-features using predictions from base models."""
+    chunks = split_into_chunks(X, chunk_size)
+    all_features = []
+    num_segments = chunks[0].shape[0]
+    chunk_size = 1000
+    for chunk in chunks:
+        chunk_pred = []
+        for start in range(0, num_segments, chunk_size):
+            end = min(start + chunk_size, num_segments)
+            segment_chunk_1 = chunk[start:end]
+            chunk_predictions_1 = np.concatenate([model.predict(segment_chunk_1) for model in models], axis=1)
+            chunk_pred.append(chunk_predictions_1)
+        chunk_pred = np.concatenate(chunk_pred, axis=0)  # Flatten the list of chunk predictions
+        all_features.append(chunk_pred)
+
+    # Concatenate features from all chunks
+    meta_features = np.concatenate(all_features, axis=1)
+
+    return meta_features

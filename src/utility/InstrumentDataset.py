@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 import pandas as pd
-from imblearn.combine import SMOTEENN
+from keras.saving.save import load_model
 from matplotlib import pyplot as plt
 import tensorflow as tf
 from sklearn.metrics import confusion_matrix
@@ -72,9 +72,13 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop
     target_count = max(np.bincount(y))  # Adjust target count as needed
     print(target_count)
     if balance_needed:
-        x, y = balance_dataset_with_augmentation(x, y, 22050, target_count)
+        models = [load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_1.keras'),
+                  load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_2.keras'),
+                  load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_3.keras'),
+                  load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_4.keras'),
+                  load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_5.keras')]
+        x, y = balance_dataset_with_augmentation(x, y, 22050, target_count, models)
     y = np.array(pd.get_dummies(y))
-    print(x[0], len(y))
     return x, y, classes
 
 
@@ -116,9 +120,6 @@ def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfc
         file_path = os.path.join(dataset_path, instrument, file)
         signal, sample_rate = librosa.load(file_path, duration=duration)
 
-        # if i > 10800:
-        #     break
-
         if not contains(file, last_file[:-9]):
             # Process the accumulated base_signal
             if base_signal:
@@ -144,8 +145,8 @@ def process_base_signal(signal, sample_rate, merge_factor, window_size, step_siz
     windows = create_sliding_windows(signal, window_size, step_size)
 
     for i, window in enumerate(windows):
-        mfcc = compute_mfcc(window, sample_rate, n_mfcc, n_fft, hop_length)
-        x.append(mfcc)
+        mel_spectrogram = compute_mel_spectrogram(window, sample_rate)
+        x.append(mel_spectrogram)
         y.append(label)
 
 
@@ -156,8 +157,6 @@ def create_sliding_windows(signal, window_size, step_size):
         windows.append(window)
     return windows
 
-
-def compute_mfcc(signal, sample_rate, n_mfcc, n_fft, hop_length):
     # MFCCs = librosa.feature.mfcc(y=signal, sr=sample_rate, n_fft=n_fft, hop_length=hop_length, n_mfcc=n_mfcc)
     # mfccs = np.mean(MFCCs.T, axis=0)
 
@@ -174,11 +173,15 @@ def compute_mfcc(signal, sample_rate, n_mfcc, n_fft, hop_length):
     # tonnetz = np.mean(tonnetz.T, axis=0)
     # print(tonnetz.shape)
 
-    spectrogram = extract_spectrogram(signal, sample_rate, n_mels=64)
     # save_spectrogram_image( spectrogram, 3)
 
     # Combine all features into a single array
     # features = np.concatenate([chromagram, spectral_contrast])
+
+
+def compute_mel_spectrogram(signal, sample_rate):
+    spectrogram = extract_spectrogram(signal, sample_rate, n_mels=64)
+
     return spectrogram.T
 
 
@@ -241,24 +244,6 @@ def plot_confusion_matrix(y_true, y_pred, classes, normalize=True, title=None, c
     print("Confusion Matrix shape:", cm.shape)
     print("Number of labels:", len(classes))
 
-    # # Assuming cm is your confusion matrix and is a numpy array
-    # num_classes = cm.shape[0]
-    # class_accuracies = {}
-    #
-    # for i in range(num_classes):
-    #     TP = cm[i, i]
-    #     FP = np.sum(cm[:, i]) - TP
-    #     FN = np.sum(cm[i, :]) - TP
-    #     TN = np.sum(cm) - (FP + FN + TP)
-    #
-    #     # Calculate the accuracy per class
-    #     accuracy = (TP + TN) / (TP + FP + FN + TN)
-    #     class_accuracies[classes[i]] = accuracy
-    #
-    # # Printing accuracies for each class
-    # for class_name, accuracy in class_accuracies.items():
-    #     print(f"Accuracy for class {class_name}: {accuracy:.2f}")
-
     if normalize:
         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
 
@@ -281,70 +266,3 @@ def plot_confusion_matrix(y_true, y_pred, classes, normalize=True, title=None, c
                     ha="center", va="center",
                     color="white" if cm[i, j] > thresh else "black")
     plt.show()
-
-
-def spec_augment(mel_spectrogram, time_warping_para=80, frequency_masking_para=27, time_masking_para=100, num_masks=1):
-    v = mel_spectrogram.shape[0]
-    tau = mel_spectrogram.shape[1]
-
-    warped_mel_spectrogram = tf.identity(mel_spectrogram)
-
-    # Frequency masking
-    for i in range(num_masks):
-        f = tf.random.uniform([], minval=0, maxval=frequency_masking_para, dtype=tf.int32)
-        f0 = tf.random.uniform([], minval=0, maxval=v - f, dtype=tf.int32)
-        warped_mel_spectrogram = tf.concat(
-            (warped_mel_spectrogram[:f0, :], tf.zeros((f, tau)), warped_mel_spectrogram[f0 + f:, :]), axis=0)
-
-    # Time masking
-    for i in range(num_masks):
-        t = tf.random.uniform([], minval=0, maxval=time_masking_para, dtype=tf.int32)
-        t0 = tf.random.uniform([], minval=0, maxval=tau - t, dtype=tf.int32)
-        warped_mel_spectrogram = tf.concat(
-            (warped_mel_spectrogram[:, :t0], tf.zeros((v, t)), warped_mel_spectrogram[:, t0 + t:]), axis=1)
-
-    return warped_mel_spectrogram
-
-
-def apply_spec_augment(X):
-    return np.array([spec_augment(x) for x in X])
-
-
-def split_into_chunks(X, chunk_size):
-    """Split the input array into chunks of specified size."""
-    chunks = []
-    num_samples, total_length, *rest = X.shape
-    print(X.shape)
-    num_chunks = (total_length + chunk_size - 1) // chunk_size  # Ceiling division
-    for i in range(num_chunks):
-        start = i * chunk_size
-        end = min(start + chunk_size, total_length)
-        chunk = X[:, start:end, ...]
-        # If the chunk is smaller than chunk_size, pad it with zeros
-        if end - start < chunk_size:
-            padding_shape = (num_samples, chunk_size - (end - start), *rest)
-            chunk = np.pad(chunk, [(0, 0), (0, padding_shape[1]), (0, 0), (0, 0)], mode='constant')
-        chunks.append(chunk)
-    return chunks
-
-
-def get_meta_features(models, X, chunk_size=44):
-    """Generate meta-features using predictions from base models."""
-    chunks = split_into_chunks(X, chunk_size)
-    all_features = []
-    num_segments = chunks[0].shape[0]
-    chunk_size = 100
-    for chunk in chunks:
-        chunk_pred = []
-        for start in range(0, num_segments, chunk_size):
-            end = min(start + chunk_size, num_segments)
-            segment_chunk_1 = chunk[start:end]
-            chunk_predictions_1 = np.concatenate([model.predict(segment_chunk_1) for model in models], axis=1)
-            chunk_pred.append(chunk_predictions_1)
-        chunk_pred = np.concatenate(chunk_pred, axis=0)  # Flatten the list of chunk predictions
-        all_features.append(chunk_pred)
-
-    # Concatenate features from all chunks
-    meta_features = np.concatenate(all_features, axis=1)
-
-    return meta_features
