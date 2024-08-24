@@ -1,0 +1,199 @@
+ensemble
+test Nava
+
+Confusion matrix
+ [[1771    0    4   14    7]
+ [   6 2062    0    2    9]
+ [  40   29 2076    2    3]
+ [  53    3    7 2421   13]
+ [   0    0    0    0 2083]]
+Accuracy for class Tar: 94.71%
+Accuracy for class Kamancheh: 98.47%
+Accuracy for class Santur: 99.47%
+Accuracy for class Setar: 99.26%
+Accuracy for class Ney: 98.49%
+Total Accuracy: 98.19%
+F1 Score for class Tar: 0.97
+F1 Score for class Kamancheh: 0.99
+F1 Score for class Santur: 0.98
+F1 Score for class Setar: 0.98
+F1 Score for class Ney: 0.99
+Macro-average F1 Score: 0.98
+Precision for class Tar: 0.95
+Recall for class Tar: 0.99
+Precision for class Kamancheh: 0.98
+Recall for class Kamancheh: 0.99
+Precision for class Santur: 0.99
+Recall for class Santur: 0.97
+Precision for class Setar: 0.99
+Recall for class Setar: 0.97
+Precision for class Ney: 0.98
+Recall for class Ney: 1.00
+Macro-average Precision: 0.98
+Macro-average Recall: 0.98
+
+test_original
+
+Confusion matrix
+ [[1771    2    8  318    7]
+ [   6 2062    0    2    9]
+ [  40   29 2076    2    3]
+ [  53    1    3 2117   13]
+ [   0    0    0    0 2083]]
+Accuracy for class Tar: 84.09%
+Accuracy for class Kamancheh: 99.18%
+Accuracy for class Santur: 96.56%
+Accuracy for class Setar: 96.80%
+Accuracy for class Ney: 100.00%
+Total Accuracy: 95.32%
+F1 Score for class Tar: 0.89
+F1 Score for class Kamancheh: 0.99
+F1 Score for class Santur: 0.98
+F1 Score for class Setar: 0.92
+F1 Score for class Ney: 0.99
+Macro-average F1 Score: 0.95
+Precision for class Tar: 0.95
+Recall for class Tar: 0.84
+Precision for class Kamancheh: 0.98
+Recall for class Kamancheh: 0.99
+Precision for class Santur: 0.99
+Recall for class Santur: 0.97
+Precision for class Setar: 0.87
+Recall for class Setar: 0.97
+Precision for class Ney: 0.98
+Recall for class Ney: 1.00
+Macro-average Precision: 0.96
+Macro-average Recall: 0.95
+
+dev nava
+
+Confusion matrix
+ [[2129    4    1   28    5]
+ [   4 2043    0    2   11]
+ [  47   48 2020    1    3]
+ [  71    8  104 1946   11]
+ [   0    0    0    0 2059]]
+Accuracy for class Tar: 98.25%
+Accuracy for class Kamancheh: 99.17%
+Accuracy for class Santur: 95.33%
+Accuracy for class Setar: 90.93%
+Accuracy for class Ney: 100.00%
+Total Accuracy: 96.70%
+F1 Score for class Tar: 0.96
+F1 Score for class Kamancheh: 0.98
+F1 Score for class Santur: 0.95
+F1 Score for class Setar: 0.95
+F1 Score for class Ney: 0.99
+Macro-average F1 Score: 0.97
+Precision for class Tar: 0.95
+Recall for class Tar: 0.98
+Precision for class Kamancheh: 0.97
+Recall for class Kamancheh: 0.99
+Precision for class Santur: 0.95
+Recall for class Santur: 0.95
+Precision for class Setar: 0.98
+Recall for class Setar: 0.91
+Precision for class Ney: 0.99
+Recall for class Ney: 1.00
+Macro-average Precision: 0.97
+Macro-average Recall: 0.97
+
+dev_original
+
+Confusion matrix
+ [[2034    5    1   48    5]
+ [  99 2043    0    2   11]
+ [  47   48 2020    1    3]
+ [  71    7  104 1926   11]
+ [   0    0    0    0 2059]]
+Accuracy for class Tar: 97.18%
+Accuracy for class Kamancheh: 94.80%
+Accuracy for class Santur: 95.33%
+Accuracy for class Setar: 90.89%
+Accuracy for class Ney: 100.00%
+Total Accuracy: 95.61%
+F1 Score for class Tar: 0.94
+F1 Score for class Kamancheh: 0.96
+F1 Score for class Santur: 0.95
+F1 Score for class Setar: 0.94
+F1 Score for class Ney: 0.99
+Macro-average F1 Score: 0.96
+Precision for class Tar: 0.90
+Recall for class Tar: 0.97
+Precision for class Kamancheh: 0.97
+Recall for class Kamancheh: 0.95
+Precision for class Santur: 0.95
+Recall for class Santur: 0.95
+Precision for class Setar: 0.97
+Recall for class Setar: 0.91
+Precision for class Ney: 0.99
+Recall for class Ney: 1.00
+Macro-average Precision: 0.96
+Macro-average Recall: 0.96
+
+my dataset val
+
+Confusion matrix
+ [[ 768    0    0    1    1]
+ [   0  845    0    0    0]
+ [   0    0  775    0    0]
+ [   0    0    0 1346    0]
+ [   0    2    0    1  815]]
+Accuracy for class Tar: 99.74%
+Accuracy for class Kamancheh: 100.00%
+Accuracy for class Santur: 100.00%
+Accuracy for class Setar: 100.00%
+Accuracy for class Ney: 99.63%
+Total Accuracy: 99.89%
+F1 Score for class Tar: 1.00
+F1 Score for class Kamancheh: 1.00
+F1 Score for class Santur: 1.00
+F1 Score for class Setar: 1.00
+F1 Score for class Ney: 1.00
+Macro-average F1 Score: 1.00
+Precision for class Tar: 1.00
+Recall for class Tar: 1.00
+Precision for class Kamancheh: 1.00
+Recall for class Kamancheh: 1.00
+Precision for class Santur: 1.00
+Recall for class Santur: 1.00
+Precision for class Setar: 1.00
+Recall for class Setar: 1.00
+Precision for class Ney: 1.00
+Recall for class Ney: 1.00
+Macro-average Precision: 1.00
+Macro-average Recall: 1.00
+
+
+my dataset test
+
+Confusion matrix
+ [[ 752    1    0    0    0]
+ [   2  845    0    0    0]
+ [   0    0  792    0    0]
+ [   0    0    1 1345    0]
+ [   1    0    0    0  825]]
+Accuracy for class Tar: 99.87%
+Accuracy for class Kamancheh: 99.76%
+Accuracy for class Santur: 100.00%
+Accuracy for class Setar: 99.93%
+Accuracy for class Ney: 99.88%
+Total Accuracy: 99.89%
+F1 Score for class Tar: 1.00
+F1 Score for class Kamancheh: 1.00
+F1 Score for class Santur: 1.00
+F1 Score for class Setar: 1.00
+F1 Score for class Ney: 1.00
+Macro-average F1 Score: 1.00
+Precision for class Tar: 1.00
+Recall for class Tar: 1.00
+Precision for class Kamancheh: 1.00
+Recall for class Kamancheh: 1.00
+Precision for class Santur: 1.00
+Recall for class Santur: 1.00
+Precision for class Setar: 1.00
+Recall for class Setar: 1.00
+Precision for class Ney: 1.00
+Recall for class Ney: 1.00
+Macro-average Precision: 1.00
+Macro-average Recall: 1.00

@@ -38,14 +38,6 @@ def add_projection_head(encoder, input_shape):
 
 
 def create_encoder(layer_sizes, input_shape):
-    # resnet = keras.applications.ResNet50V2(
-    #     include_top=False, weights=None, input_shape=INPUT_SHAPE, pooling="avg"
-    # )
-    #
-    # inputs = keras.Input(shape=INPUT_SHAPE)
-    # outputs = resnet(inputs)
-    # model = keras.Model(inputs=inputs, outputs=outputs, name="cifar10-encoder")
-
     model = Sequential()
     model.add(layers.Conv2D(layer_sizes[0], (3, 3), activation='relu', input_shape=input_shape, padding='same'))
     model.add(layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same'))

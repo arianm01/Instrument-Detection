@@ -262,7 +262,7 @@ def build_tcn_model(input_shape, num_classes, kernel_size=3, nb_filters=64, dila
 
 
 def train_contrastive_model(x, y, num_classes):
-    """ Train Siamese network using contrastive learning """
+    """ Train contrastive network using contrastive learning """
     n_splits = 5
     if y.ndim > 1:
         y_labels = np.argmax(y, axis=1)
@@ -291,8 +291,6 @@ def train_contrastive_model(x, y, num_classes):
         temperature = 0.1
         num_epochs = 100
 
-        # if fold_no > 2:
-        #     continue
         layer_sizes = [256, 128, 64, 32, 16]
 
         encoder = create_encoder(layer_sizes, input_shape)
@@ -307,8 +305,6 @@ def train_contrastive_model(x, y, num_classes):
                                          validation_data=(x_test, y_test),
                                          epochs=num_epochs,
                                          callbacks=[model_checkpoint_callback, early_stopping, lr_scheduler])
-        # encoder = load_model(f'./model_best_encoder_{fold_no}.keras', custom_objects={
-        #     'SupervisedContrastiveLoss': SupervisedContrastiveLoss}).layers[1]
 
         classifier = create_classifier(encoder, num_classes, input_shape, trainable=False)
 
@@ -316,35 +312,7 @@ def train_contrastive_model(x, y, num_classes):
                                  validation_data=(x_test, y_te),
                                  callbacks=[model_callback, early_stopping, lr_scheduler])
 
-        # accuracy = classifier.evaluate(x_test, y_test)[1]
-        # print(f"Test accuracy: {round(accuracy * 100, 2)}%")
-
         histories.append(history)
         fold_no += 1
 
     return histories
-
-
-def evaluate_contrastive_model(x, y, classes):
-    """ Evaluate Siamese network on a separate Contrastive set """
-    model_path = 'model_best_Siamese_1.keras'  # Adjust the path as necessary
-    model = load_model(model_path, custom_objects={'contrastive_loss': contrastive_loss,
-                                                   'EuclideanDistanceLayer': EuclideanDistanceLayer})
-
-    embeddings = generate_embeddings(model, x, 'model_1')
-
-    # Split data
-    x_train, x_test, y_train, y_test = train_test_split(embeddings, y, test_size=0.2, random_state=42)
-
-    # Define classifier model
-
-    # Train classifier
-    input_shape = embeddings.shape[1]
-    num_classes = y.shape[1]
-    model_checkpoint_path = 'model_best_contrastive_1.keras'
-    model_checkpoint_callback = callbacks.ModelCheckpoint(
-        filepath=model_checkpoint_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
-    classifier_model = create_classifier_model(input_shape, num_classes, [128, 64, 32])
-    classifier_model.summary()
-    history = classifier_model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=200, batch_size=32,
-                                   callbacks=[model_checkpoint_callback])
