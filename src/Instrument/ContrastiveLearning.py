@@ -103,36 +103,3 @@ def create_classifier_on_siamese(base_model, input_shape, num_classes):
     model = Model(inputs=model_input, outputs=classifier_output)
     model.compile(loss='categorical_crossentropy', optimizer=Adam(), metrics=['accuracy'])
     return model
-
-
-def evaluate_combined_contrastive_model(x, y, classes):
-    model_path = './Test/5 sec/model_best_Siamese_1.keras'  # Adjust the path as necessary
-    siamese_model = load_model(model_path, custom_objects={'contrastive_loss': contrastive_loss,
-                                                           'EuclideanDistanceLayer': EuclideanDistanceLayer})
-
-    base_network = siamese_model.get_layer('model')  # Assuming the base network is named 'model'
-
-    # Create a Contrastive model that includes the base network and the classifier on top
-    input_shape = x.shape[1:]
-    num_classes = len(classes)
-    combined_model = create_classifier_on_siamese(base_network, input_shape, num_classes)
-
-    # Split data
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
-
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_checkpoint_path = f'model_best_combined_{timestamp}.keras'
-    model_checkpoint_callback = ModelCheckpoint(
-        filepath=model_checkpoint_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
-
-    history = combined_model.fit(
-        x_train, y_train, validation_data=(x_test, y_test), epochs=50, batch_size=32,
-        callbacks=[model_checkpoint_callback]
-    )
-
-    y_pred = combined_model.predict(x_test)
-    y_pred_classes = np.argmax(y_pred, axis=1)
-    y_true = np.argmax(y_test, axis=1)
-
-    print(classification_report(y_true, y_pred_classes, target_names=classes))
-    return combined_model, history

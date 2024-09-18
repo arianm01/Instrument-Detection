@@ -7,8 +7,8 @@ from keras.saving.save import load_model
 from matplotlib import pyplot as plt
 from sklearn.model_selection import StratifiedKFold
 
-from main import evaluate_models
-from utility import InstrumentDataset
+from src.main.main import evaluate_models
+from src.utility import InstrumentDataset
 
 DATASET_PATH = '../Dataset'
 
