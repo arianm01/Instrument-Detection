@@ -82,36 +82,6 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop
     return x, y, classes
 
 
-def separate_and_balance_data(X, y, instruments):
-    """Separate and balance data for each Instrument."""
-    instrument_data = {}
-    if y.ndim > 1:
-        y_labels = np.argmax(y, axis=1)
-    else:
-        y_labels = y
-
-    for y_label in np.unique(y_labels):
-        # Binary labels: 1 for the Instrument, 0 for others
-        y_binary = (y_labels == y_label).astype(int)
-
-        # Separate the positive and negative classes
-        X_pos = X[y_binary == 1]
-        X_neg = X[y_binary == 0]
-        y_pos = y_binary[y_binary == 1]
-        y_neg = y_binary[y_binary == 0]
-
-        # Undersample the negative class
-        X_neg_resampled, y_neg_resampled = resample(X_neg, y_neg, replace=False, n_samples=len(X_pos), random_state=42)
-
-        # Combine the resampled negative class with the positive class
-        X_balanced = np.vstack((X_pos, X_neg_resampled))
-        y_balanced = np.hstack((y_pos, y_neg_resampled))
-
-        instrument_data[instruments[y_label]] = (X_balanced, y_balanced)
-
-    return instrument_data
-
-
 def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y, label,
                   window_size, step_size):
     base_signal, seg, last_file = [], 1, ''
