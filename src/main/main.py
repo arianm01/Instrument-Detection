@@ -10,7 +10,7 @@ from src.Instrument.Kaggle import cnn_model, lr_time_based_decay, build_tcn_mode
     cnn_model_binary, train_contrastive_model
 from src.main.TransformerModel import build_transformer_model
 from src.utility import InstrumentDataset
-from src.utility.InstrumentDataset import plot_confusion_matrix
+from src.utility.InstrumentDataset import plot_confusion_matrix, separate_and_balance_data
 from src.utility.utils import test_gpu, sanitize_file_name, get_meta_features, get_model_feature
 
 TIME_FRAME = 1
