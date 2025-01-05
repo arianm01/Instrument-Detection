@@ -1,0 +1,39 @@
+Test
+
+Confusion matrix
+ [[ 46  52  43  53   4  58  32]
+ [ 38  50  36  47  52  36  35]
+ [ 19  39 167  21   3  18  14]
+ [ 23   6  34 135  21  24  35]
+ [ 29  16  83  25  76  38  19]
+ [ 36  59  12  50  34  74  21]
+ [  4  21  20  53  50  41  96]]
+Accuracy for class Shour: 15.97%
+Accuracy for class Segah: 17.01%
+Accuracy for class Mahour: 59.43%
+Accuracy for class Homayoun: 48.56%
+Accuracy for class RastPanjgah: 26.57%
+Accuracy for class Nava: 25.87%
+Accuracy for class Chahargah: 33.68%
+Total Accuracy: 32.23%
+Macro-average F1 Score: 0.31
+Macro-average Precision: 0.31
+Macro-average Recall: 0.32
+
+Val
+Confusion matrix
+ [[ 93  51  42  40  10  29  22]
+ [ 38 117  11  37  21  17  44]
+ [ 18  46 131  27  11  24  30]
+ [ 13  17  39 180   8  19  13]
+ [ 21   8  55  18 126  24  26]
+ [ 22  31   9  38  30 139  23]
+ [ 12  17   9  34  27  25 164]]
+Accuracy for class Shour: 32.40%
+Accuracy for class Segah: 41.05%
+Accuracy for class Mahour: 45.64%
+Accuracy for class Homayoun: 62.28%
+Accuracy for class RastPanjgah: 45.32%
+Accuracy for class Nava: 47.60%
+Accuracy for class Chahargah: 56.94%
+Total Accuracy: 47.36%

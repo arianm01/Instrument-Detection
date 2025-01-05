@@ -1,5 +1,5 @@
-import numpy as np
 import librosa
+import numpy as np
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler, EarlyStopping
 from keras.models import load_model
 from keras.utils.version_utils import callbacks
@@ -7,14 +7,14 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from tcn import tcn_full_summary
 
 from src.Instrument.Kaggle import cnn_model, lr_time_based_decay, build_tcn_model, create_classifier_model, \
-    cnn_model_binary, train_contrastive_model
+    train_contrastive_model
 from src.main.TransformerModel import build_transformer_model
 from src.utility import InstrumentDataset
-from src.utility.InstrumentDataset import plot_confusion_matrix, separate_and_balance_data
-from src.utility.utils import test_gpu, sanitize_file_name, get_meta_features, get_model_feature
+from src.utility.InstrumentDataset import plot_confusion_matrix
+from src.utility.utils import test_gpu, get_model_feature
 
 TIME_FRAME = 1
-MERGE_FACTOR = 2
+MERGE_FACTOR = 60
 
 # Initialize GPU configuration
 test_gpu()
@@ -56,14 +56,14 @@ def train_models(x, y):
         x_train, x_test = x[train_index], x[test_index]
         y_train, y_test = y[train_index], y[test_index]
 
-        if fold_no < 3:
+        if fold_no < 2:
             continue
 
         print(f'Training fold {fold_no}...')
         input_shape = (x_train.shape[1], x_train.shape[2], 1)
         num_classes = y_train.shape[1]
         layer_sizes = [256, 128, 64, 32, 16]
-        history = cnn_model(input_shape, num_classes, layer_sizes, x_train, y_train, x_test, y_test, fold_no, 8, 80)
+        history = cnn_model(input_shape, num_classes, layer_sizes, x_train, y_train, x_test, y_test, fold_no, 16, 100)
         histories.append(history)
         fold_no += 1
 
@@ -117,11 +117,11 @@ def train_meta_model(X_train, y_train, x_test, y_test):
     """Train meta-model using meta-features."""
     input_shape = X_train.shape[1]
 
-    model = create_classifier_model(input_shape, 5, [2048, 1024, 512, 256, 128])
+    model = create_classifier_model(input_shape, 7, [4096, 2048, 1024, 512, 256, 128])
     model_checkpoint_callback = callbacks.ModelCheckpoint(
         filepath='ensemble.keras', save_best_only=True, monitor='val_loss', mode='min', verbose=1)
     lr_scheduler = callbacks.LearningRateScheduler(lr_time_based_decay, verbose=1)
-    early_stopping = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True)
+    early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
     model.summary()
     model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(x_test, y_test),
@@ -132,7 +132,7 @@ def train_meta_model(X_train, y_train, x_test, y_test):
 def ensemble_learning(x, y, models):
     meta_features = get_model_feature(x, models)
 
-    X_train, X_val, y_train, y_val = train_test_split(meta_features, y, test_size=0.2, random_state=42)
+    X_train, X_val, y_train, y_val = train_test_split(meta_features, y, test_size=0.1, random_state=42)
 
     meta_model = train_meta_model(X_train, y_train, X_val, y_val)
 
@@ -150,7 +150,7 @@ def main():
               load_model('../../output/15 classes/Contrastive/1 sec/model_best_classifier_3.keras'),
               load_model('../../output/15 classes/Contrastive/1 sec/model_best_classifier_4.keras'),
               load_model('../../output/15 classes/Contrastive/1 sec/model_best_classifier_5.keras')]
-    ensemble_learning(x, y)
+    ensemble_learning(x, y, models)
     # expert_training(x, y, classes, models)
 
     # for history in histories:

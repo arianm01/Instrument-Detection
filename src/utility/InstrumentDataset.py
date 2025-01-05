@@ -182,14 +182,14 @@ def plot_history(history):
 
     # create accuracy sublpot
     axs[0].plot(history.history["accuracy"], label="train accuracy")
-    axs[0].plot(history.history["val_accuracy"], label="Contrastive accuracy")
+    axs[0].plot(history.history["val_accuracy"], label="1 sec accuracy")
     axs[0].set_ylabel("Accuracy")
     axs[0].legend(loc="lower right")
     axs[0].set_title("Accuracy eval")
 
     # create error sublpot
     axs[1].plot(history.history["loss"], label="train error")
-    axs[1].plot(history.history["val_loss"], label="Contrastive error")
+    axs[1].plot(history.history["val_loss"], label="1 sec error")
     axs[1].set_ylabel("Error")
     axs[1].set_xlabel("Epoch")
     axs[1].legend(loc="upper right")

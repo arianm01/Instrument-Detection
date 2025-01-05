@@ -14,11 +14,11 @@ def main():
 
     x, y, _ = InstrumentDataset.read_data(audio_path, 10, TIME_FRAME,
                                           folder='../../Models/splits/val', balance_needed=False)
-    models_addr = ['../../output/15 classes/Contrastive/1 sec/model_best_classifier_1.keras',
-                   '../../output/15 classes/Contrastive/1 sec/model_best_classifier_2.keras',
-                   '../../output/15 classes/Contrastive/1 sec/model_best_classifier_3.keras',
-                   '../../output/15 classes/Contrastive/1 sec/model_best_classifier_4.keras',
-                   '../../output/15 classes/Contrastive/1 sec/model_best_classifier_5.keras']
+    models_addr = ['../../output/15 classes/1 sec/1 sec/model_best_classifier_1.keras',
+                   '../../output/15 classes/1 sec/1 sec/model_best_classifier_2.keras',
+                   '../../output/15 classes/1 sec/1 sec/model_best_classifier_3.keras',
+                   '../../output/15 classes/1 sec/1 sec/model_best_classifier_4.keras',
+                   '../../output/15 classes/1 sec/1 sec/model_best_classifier_5.keras']
     path = '../../output/15 classes/Contrastive/10 sec/ensemble.keras'
     model, models, model_base = load_models(path, models_addr, models_addr[0])
 

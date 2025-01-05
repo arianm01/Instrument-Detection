@@ -1,0 +1,85 @@
+Test
+
+Confusion matrix
+ [[123 218 112 165  60 198 131]
+ [162 213  98 192 140  88 143]
+ [103 152 404 114  36  79  97]
+ [104 101  70 390  67  78 175]
+ [ 98  85 320  89 155 130 128]
+ [135 208  37 199 110 235  84]
+ [ 41 124  76 184 180 152 233]]
+Accuracy for class Shour: 12.21%
+Accuracy for class Segah: 20.56%
+Accuracy for class Mahour: 41.02%
+Accuracy for class Homayoun: 39.59%
+Accuracy for class RastPanjgah: 15.42%
+Accuracy for class Nava: 23.31%
+Accuracy for class Chahargah: 23.54%
+Total Accuracy: 24.99%
+F1 Score for class Shour: 0.14
+F1 Score for class Segah: 0.20
+F1 Score for class Mahour: 0.38
+F1 Score for class Homayoun: 0.34
+F1 Score for class RastPanjgah: 0.18
+F1 Score for class Nava: 0.24
+F1 Score for class Chahargah: 0.24
+Macro-average F1 Score: 0.24
+Precision for class Shour: 0.16
+Recall for class Shour: 0.12
+Precision for class Segah: 0.19
+Recall for class Segah: 0.21
+Precision for class Mahour: 0.36
+Recall for class Mahour: 0.41
+Precision for class Homayoun: 0.29
+Recall for class Homayoun: 0.40
+Precision for class RastPanjgah: 0.21
+Recall for class RastPanjgah: 0.15
+Precision for class Nava: 0.24
+Recall for class Nava: 0.23
+Precision for class Chahargah: 0.24
+Recall for class Chahargah: 0.24
+Macro-average Precision: 0.24
+Macro-average Recall: 0.25
+
+Dev
+
+Confusion matrix
+ [[293 189 136 135  37  91 119]
+ [127 411  57 124  44  70 158]
+ [ 89 152 342 173  60  70 121]
+ [ 72 127 128 471  37  72  98]
+ [ 72  49 208  73 338  93 143]
+ [ 84 164  28 139 126 375  96]
+ [ 69  84  47 160  90  65 487]]
+Accuracy for class Shour: 29.30%
+Accuracy for class Segah: 41.47%
+Accuracy for class Mahour: 33.96%
+Accuracy for class Homayoun: 46.87%
+Accuracy for class RastPanjgah: 34.63%
+Accuracy for class Nava: 37.06%
+Accuracy for class Chahargah: 48.60%
+Total Accuracy: 38.85%
+F1 Score for class Shour: 0.32
+F1 Score for class Segah: 0.38
+F1 Score for class Mahour: 0.35
+F1 Score for class Homayoun: 0.41
+F1 Score for class RastPanjgah: 0.40
+F1 Score for class Nava: 0.41
+F1 Score for class Chahargah: 0.44
+Macro-average F1 Score: 0.39
+Precision for class Shour: 0.36
+Recall for class Shour: 0.29
+Precision for class Segah: 0.35
+Recall for class Segah: 0.41
+Precision for class Mahour: 0.36
+Recall for class Mahour: 0.34
+Precision for class Homayoun: 0.37
+Recall for class Homayoun: 0.47
+Precision for class RastPanjgah: 0.46
+Recall for class RastPanjgah: 0.35
+Precision for class Nava: 0.45
+Recall for class Nava: 0.37
+Precision for class Chahargah: 0.40
+Recall for class Chahargah: 0.49
+Macro-average Precision: 0.39
+Macro-average Recall: 0.39

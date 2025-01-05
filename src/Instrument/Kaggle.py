@@ -276,7 +276,7 @@ def train_contrastive_model(x, y, num_classes):
         x_train, x_test = x[train_index], x[test_index]
         y_train, y_test = y_labels[train_index], y_labels[test_index]
         y_tr, y_te = y[train_index], y[test_index]
-        batch_size = 32
+        batch_size = 16
 
         model_checkpoint_path = f'model_best_encoder_{fold_no}.keras'
         model_path = f'model_best_classifier_{fold_no}.keras'
@@ -291,20 +291,27 @@ def train_contrastive_model(x, y, num_classes):
         temperature = 0.1
         num_epochs = 100
 
+        # layer_sizes = [512, 256, 128, 64, 32]
+        # layer_sizes = [128, 64, 32, 16, 8]
         layer_sizes = [256, 128, 64, 32, 16]
+        # if fold_no < 4:
+        #     continue
+        if fold_no == 1:
+            encoder = load_model(f'./model_best_encoder_{fold_no}.keras', custom_objects={
+                'SupervisedContrastiveLoss': SupervisedContrastiveLoss}).layers[1]
+        else:
+            encoder = create_encoder(layer_sizes, input_shape)
 
-        encoder = create_encoder(layer_sizes, input_shape)
+            encoder_with_projection_head = add_projection_head(encoder, input_shape)
+            encoder_with_projection_head.compile(optimizer=keras.optimizers.Adam(learning_rate),
+                                                 loss=SupervisedContrastiveLoss(temperature))
 
-        encoder_with_projection_head = add_projection_head(encoder, input_shape)
-        encoder_with_projection_head.compile(optimizer=keras.optimizers.Adam(learning_rate),
-                                             loss=SupervisedContrastiveLoss(temperature))
+            encoder_with_projection_head.summary()
 
-        encoder_with_projection_head.summary()
-
-        encoder_with_projection_head.fit(x=x_train, y=y_train, batch_size=batch_size,
-                                         validation_data=(x_test, y_test),
-                                         epochs=num_epochs,
-                                         callbacks=[model_checkpoint_callback, early_stopping, lr_scheduler])
+            encoder_with_projection_head.fit(x=x_train, y=y_train, batch_size=batch_size,
+                                             validation_data=(x_test, y_test),
+                                             epochs=num_epochs,
+                                             callbacks=[model_checkpoint_callback, early_stopping, lr_scheduler])
 
         classifier = create_classifier(encoder, num_classes, input_shape, trainable=False)
 
