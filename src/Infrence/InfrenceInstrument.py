@@ -106,9 +106,9 @@ def predict_segments(segments, model, models, model_base, contrastive=False):
         if contrastive:
             predictions = predict_contrastive(segments, model)
         else:
-            meta = get_model_feature(segments, models)
-            predictions = model.predict(meta)
-            # predictions = model_base.predict(segments)
+           # meta = get_model_feature(segments, models)
+           # predictions = model.predict(meta)
+           predictions = model.predict(segments)
         return np.argmax(predictions, axis=1)
     except Exception as e:
         print(f"Error during prediction: {str(e)}")
@@ -131,14 +131,15 @@ def extract_label(file_name):
 
 def load_models(addr_model, addr_models, addr_model_base):
     """Loads the required models."""
-    model = load_model(addr_model)
-    models = [load_model(addr_models[0]), load_model(addr_models[1]), load_model(addr_models[2]),
-              load_model(addr_models[3]), load_model(addr_models[4])]
-    model_base = load_model(addr_model_base, custom_objects={
-        'SupervisedContrastiveLoss': SupervisedContrastiveLoss
-    })
-    # models = []
-    # model_base = 2
+    model = load_model(addr_models[0])
+    # model.summary()
+    # models = [load_model(addr_models[0]), load_model(addr_models[1]), load_model(addr_models[2]),
+    #           load_model(addr_models[3]), load_model(addr_models[4])]
+    # model_base = load_model(addr_model_base, custom_objects={
+    #     'SupervisedContrastiveLoss': SupervisedContrastiveLoss
+    # })
+    models = []
+    model_base = 2
     return model, models, model_base
 
 

@@ -14,7 +14,7 @@ from src.utility.InstrumentDataset import plot_confusion_matrix
 from src.utility.utils import test_gpu, get_model_feature
 
 TIME_FRAME = 1
-MERGE_FACTOR = 60
+MERGE_FACTOR = 5
 
 # Initialize GPU configuration
 test_gpu()
@@ -31,7 +31,7 @@ def extract_features(signal, frame_size, hop_length):
 def load_data():
     """ Load and preprocess data """
     x, y, classes = InstrumentDataset.read_data('../../Dataset', MERGE_FACTOR, TIME_FRAME,
-                                                folder='../../Models/splits/train')
+                                                folder='../../Models/split/train')
     print(np.array(x).shape)
     X = np.array(x)[..., np.newaxis]  # Add an extra dimension for the channels
     print(f'The shape of X is {X.shape}')
@@ -145,12 +145,12 @@ def main():
     # models = [load_model('./model_best_CNN_6.h5'), load_model('./model_best_CNN_7.h5'),
     #           load_model('./model_best_CNN_10.h5'), load_model('./model_best_CNN_8.h5'),
     #           load_model('./model_best_CNN_9.h5')]
-    models = [load_model('../../output/15 classes/Contrastive/1 sec/model_best_classifier_1.keras'),
-              load_model('../../output/15 classes/Contrastive/1 sec/model_best_classifier_2.keras'),
-              load_model('../../output/15 classes/Contrastive/1 sec/model_best_classifier_3.keras'),
-              load_model('../../output/15 classes/Contrastive/1 sec/model_best_classifier_4.keras'),
-              load_model('../../output/15 classes/Contrastive/1 sec/model_best_classifier_5.keras')]
-    ensemble_learning(x, y, models)
+    # models = [load_model('../../output/15 classes/Contrastive/1 sec/model_best_classifier_1.keras'),
+    #           load_model('../../output/15 classes/Contrastive/1 sec/model_best_classifier_2.keras'),
+    #           load_model('../../output/15 classes/Contrastive/1 sec/model_best_classifier_3.keras'),
+    #           load_model('../../output/15 classes/Contrastive/1 sec/model_best_classifier_4.keras'),
+    #           load_model('../../output/15 classes/Contrastive/1 sec/model_best_classifier_5.keras')]
+    # ensemble_learning(x, y, models)
     # expert_training(x, y, classes, models)
 
     # for history in histories:

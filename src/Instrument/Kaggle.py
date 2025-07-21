@@ -270,13 +270,12 @@ def train_contrastive_model(x, y, num_classes):
         y_labels = y
 
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
-    histories = []
 
     for fold_no, (train_index, test_index) in enumerate(skf.split(x, y_labels), start=1):
         x_train, x_test = x[train_index], x[test_index]
         y_train, y_test = y_labels[train_index], y_labels[test_index]
         y_tr, y_te = y[train_index], y[test_index]
-        batch_size = 16
+        batch_size = 4
 
         model_checkpoint_path = f'model_best_encoder_{fold_no}.keras'
         model_path = f'model_best_classifier_{fold_no}.keras'
@@ -296,7 +295,7 @@ def train_contrastive_model(x, y, num_classes):
         layer_sizes = [256, 128, 64, 32, 16]
         # if fold_no < 4:
         #     continue
-        if fold_no == 1:
+        if fold_no == 2:
             encoder = load_model(f'./model_best_encoder_{fold_no}.keras', custom_objects={
                 'SupervisedContrastiveLoss': SupervisedContrastiveLoss}).layers[1]
         else:
@@ -315,11 +314,8 @@ def train_contrastive_model(x, y, num_classes):
 
         classifier = create_classifier(encoder, num_classes, input_shape, trainable=False)
 
-        history = classifier.fit(x=x_train, y=y_tr, batch_size=batch_size, epochs=num_epochs,
+        classifier.fit(x=x_train, y=y_tr, batch_size=batch_size, epochs=num_epochs,
                                  validation_data=(x_test, y_te),
                                  callbacks=[model_callback, early_stopping, lr_scheduler])
 
-        histories.append(history)
         fold_no += 1
-
-    return histories

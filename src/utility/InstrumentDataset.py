@@ -33,7 +33,7 @@ def get_files(instrument, folder):
 
 
 def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop_length=512,
-              folder='./Models/Instrument/splits/train',
+              folder='./Models/split/train',
               balance_needed=True):
     """
     Reads audio files from the dataset directory, computes MFCC features, and returns them with labels.
@@ -56,15 +56,15 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop
     """
     x, y = [], []
     sample_rate = 22050
-    classes = ['Tar', 'Kamancheh', 'Santur', 'Setar', 'Ney']
-    # classes = os.listdir(dataset_path)
+    # classes = ['Tar', 'Kamancheh', 'Santur', 'Setar', 'Ney']
+    classes = os.listdir(dataset_path)
     print(classes)
     for i, instrument in enumerate(classes):
         print(instrument)
         files = get_files(instrument, folder)
         files.sort()
         process_files(files, dataset_path, instrument, merge_factor, duration, n_mfcc, n_fft, hop_length, x, y, i,
-                      duration * merge_factor * sample_rate, int(duration * sample_rate))
+                      duration * merge_factor * sample_rate, int(duration * sample_rate * merge_factor))
 
     y = np.array(y)
     x = np.array(x)
@@ -72,12 +72,12 @@ def read_data(dataset_path, merge_factor, duration=1, n_mfcc=26, n_fft=2048, hop
     target_count = max(np.bincount(y))  # Adjust target count as needed
     print(target_count)
     if balance_needed:
-        models = [load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_1.keras'),
-                  load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_2.keras'),
-                  load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_3.keras'),
-                  load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_4.keras'),
-                  load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_5.keras')]
-        x, y = balance_dataset_with_augmentation(x, y, 22050, target_count, models)
+        # models = [load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_1.keras'),
+        #           load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_2.keras'),
+        #           load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_3.keras'),
+        #           load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_4.keras'),
+        #           load_model('../../output/5 classes/Contrastive/1 sec/model_best_classifier_5.keras')]
+        x, y = balance_dataset_with_augmentation(x, y, 22050, target_count)
     y = np.array(pd.get_dummies(y))
     return x, y, classes
 
@@ -86,27 +86,48 @@ def process_files(files, dataset_path, instrument, merge_factor, duration, n_mfc
                   window_size, step_size):
     base_signal, seg, last_file = [], 1, ''
 
-    for i, file in enumerate(tqdm(files)):
-        file_path = os.path.join(dataset_path, instrument, file)
-        signal, sample_rate = librosa.load(file_path, duration=duration)
+    # List the file names once
+    file_names = os.listdir(os.path.join(dataset_path, instrument))
 
-        if not contains(file, last_file[:-9]):
-            # Process the accumulated base_signal
-            if base_signal:
-                base_signal = np.concatenate(base_signal)
-                process_base_signal(base_signal, sample_rate, merge_factor, window_size, step_size, n_mfcc, n_fft,
-                                    hop_length, x, y, label)
-            base_signal, seg = [], 1
+    def load_file(file_name):
+        """
+        Check if the file_name starts with any of the prefixes in `files`.
+        If so, loads the audio and returns the updated last_file, sample_rate, and appended signal.
+        """
+        for prefix in files:
+            if file_name.startswith(prefix):
+                file_path = os.path.join(dataset_path, instrument, file_name)
+                signal, sample_rate = librosa.load(file_path, duration=duration)
+                return file_name, signal, sample_rate
+        return None, None, None
 
-        base_signal.append(signal)
-        last_file = file
-        seg += 1
+    for file_name in tqdm(file_names):
+        # If the current file is part of the same group as the last file, accumulate the signal
+        if contains(file_name, last_file[:-9]):
+            new_last, signal, sample_rate = load_file(file_name)
+            if signal is not None:
+                base_signal.append(signal)
+                last_file = new_last
+                seg += 1
+        # Otherwise, if there is accumulated data, process it and start a new accumulation
+        elif base_signal:
+            # Process the accumulated signals
+            concatenated_signal = np.concatenate(base_signal)
+            process_base_signal(concatenated_signal, sample_rate, merge_factor, window_size, step_size,
+                                n_mfcc, n_fft, hop_length, x, y, label)
+            # Reset accumulation
+            base_signal, seg, last_file = [], 1, ""
+            # Also load the current file to start a new accumulation
+            new_last, signal, sample_rate = load_file(file_name)
+            if signal is not None:
+                base_signal.append(signal)
+                last_file = new_last
 
-    # Process the remaining signals after the loop
+    # Process any remaining accumulated signals after looping
     if base_signal:
-        base_signal = np.concatenate(base_signal)
-        process_base_signal(base_signal, step_size, merge_factor, window_size, step_size, n_mfcc, n_fft, hop_length,
-                            x, y, label)
+        concatenated_signal = np.concatenate(base_signal)
+        process_base_signal(concatenated_signal, sample_rate, merge_factor, window_size, step_size,
+                            n_mfcc, n_fft, hop_length, x, y, label)
 
 
 def process_base_signal(signal, sample_rate, merge_factor, window_size, step_size, n_mfcc, n_fft, hop_length, x, y,
