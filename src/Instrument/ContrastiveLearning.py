@@ -11,9 +11,6 @@ from keras.saving.save import load_model
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 
-from src.utility.EuclideanDistanceLayer import EuclideanDistanceLayer
-
-
 def create_base_network(input_shape):
     """Base network to be shared (Siamese Network)"""
     _input = Input(shape=input_shape)

@@ -7,7 +7,6 @@ from tensorflow.keras.models import load_model
 
 from src.Instrument.Contrastive import SupervisedContrastiveLoss
 from src.Instrument.ContrastiveLearning import generate_embeddings
-from src.main.TransformerModel import model
 from src.main.main import get_model_feature
 from src.utility.InstrumentDataset import create_sliding_windows, compute_mel_spectrogram
 
@@ -104,7 +103,7 @@ def predict_segments(segments, model, models, model_base, contrastive=False):
     """Predicts the labels for the given segments using the appropriate model."""
     try:
         if contrastive:
-            predictions = predict_contrastive(segments, model)
+            predictions = predict_contrastive(segments, model, model_base)
         else:
            # meta = get_model_feature(segments, models)
            # predictions = model.predict(meta)
@@ -115,7 +114,7 @@ def predict_segments(segments, model, models, model_base, contrastive=False):
         return np.array([])
 
 
-def predict_contrastive(segments, model_base):
+def predict_contrastive(segments, model, model_base):
     """Generates predictions using the contrastive learning model."""
     embeddings = generate_embeddings(model_base, segments, 'model')
     return model.predict(embeddings)

@@ -1,24 +1,16 @@
 import numpy as np
-import librosa
-from keras import Input, Model
+from keras import Input
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.layers import TimeDistributed, Conv2D, BatchNormalization, MaxPooling2D, Dropout, Flatten, LSTM, Dense, \
     Activation
 from keras.optimizers import Adam
-from keras.regularizers import l2, l1, l1_l2
-from keras.saving.save import load_model
-from sklearn.utils import class_weight
 from tcn import TCN
 from tensorflow.keras import Sequential, callbacks, layers, regularizers, models
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from tensorflow import keras
-import tensorflow as tf
 
 from src.Instrument.Contrastive import create_encoder, add_projection_head, learning_rate, SupervisedContrastiveLoss, \
     create_classifier
-from src.Instrument.ContrastiveLearning import generate_pairs, create_base_network, contrastive_loss, \
-    generate_embeddings
-from src.utility.EuclideanDistanceLayer import EuclideanDistanceLayer
 
 # Set constants for the learning rate schedule
 INITIAL_LEARNING_RATE = 0.0001
@@ -293,29 +285,26 @@ def train_contrastive_model(x, y, num_classes):
         # layer_sizes = [512, 256, 128, 64, 32]
         # layer_sizes = [128, 64, 32, 16, 8]
         layer_sizes = [256, 128, 64, 32, 16]
-        # if fold_no < 4:
-        #     continue
-        if fold_no == 2:
-            encoder = load_model(f'./model_best_encoder_{fold_no}.keras', custom_objects={
-                'SupervisedContrastiveLoss': SupervisedContrastiveLoss}).layers[1]
-        else:
-            encoder = create_encoder(layer_sizes, input_shape)
 
-            encoder_with_projection_head = add_projection_head(encoder, input_shape)
-            encoder_with_projection_head.compile(optimizer=keras.optimizers.Adam(learning_rate),
-                                                 loss=SupervisedContrastiveLoss(temperature))
+        # encoder = load_model(f'./model_best_encoder_{fold_no}.keras', custom_objects={
+        #     'SupervisedContrastiveLoss': SupervisedContrastiveLoss}).layers[1]
 
-            encoder_with_projection_head.summary()
+        encoder = create_encoder(layer_sizes, input_shape)
 
-            encoder_with_projection_head.fit(x=x_train, y=y_train, batch_size=batch_size,
-                                             validation_data=(x_test, y_test),
-                                             epochs=num_epochs,
-                                             callbacks=[model_checkpoint_callback, early_stopping, lr_scheduler])
+        encoder_with_projection_head = add_projection_head(encoder, input_shape)
+        encoder_with_projection_head.compile(optimizer=keras.optimizers.Adam(learning_rate),
+                                             loss=SupervisedContrastiveLoss(temperature))
+
+        encoder_with_projection_head.summary()
+
+        encoder_with_projection_head.fit(x=x_train, y=y_train, batch_size=batch_size,
+                                         validation_data=(x_test, y_test),
+                                         epochs=num_epochs,
+                                         callbacks=[model_checkpoint_callback, early_stopping, lr_scheduler])
 
         classifier = create_classifier(encoder, num_classes, input_shape, trainable=False)
 
-        classifier.fit(x=x_train, y=y_tr, batch_size=batch_size, epochs=num_epochs,
-                                 validation_data=(x_test, y_te),
-                                 callbacks=[model_callback, early_stopping, lr_scheduler])
+        classifier.fit(x=x_train, y=y_tr, batch_size=batch_size, epochs=num_epochs, validation_data=(x_test, y_te),
+                       callbacks=[model_callback, early_stopping, lr_scheduler])
 
         fold_no += 1
