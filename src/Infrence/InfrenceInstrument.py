@@ -7,17 +7,19 @@ from tensorflow.keras.models import load_model
 
 from src.Instrument.Contrastive import SupervisedContrastiveLoss
 from src.Instrument.ContrastiveLearning import generate_embeddings
-from src.main.TransformerModel import model
 from src.main.main import get_model_feature
 from src.utility.InstrumentDataset import create_sliding_windows, compute_mel_spectrogram
 
 # Constants
 LABEL_MAPPING = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4}
+LABEL_MAPPING_dastgah = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6}
 All_LABEL_MAPPING = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10, 11: 11, 12: 12, 13: 13, 14: 14}
+Dastgahs = ['Shour', 'Segah', 'Mahour', 'Homayoun', 'RastPanjgah', 'Nava', 'Chahargah']
 CLASSES = ['Tar', 'Kamancheh', 'Santur', 'Setar', 'Ney', '']
 All_CLASSES = ['Daf', 'Divan', 'Dutar', 'Gheychak', 'Kamancheh', 'Ney', 'Ney Anban', 'Oud', 'Qanun', 'Rubab', 'Santur',
                'Setar', 'Tanbour', 'Tar', 'Tonbak', '']
 mapping = {i: All_CLASSES.index(cls) for i, cls in enumerate(CLASSES)}
+IsDastgahDetection = True
 
 
 def class_mapping(predictions):
@@ -52,13 +54,13 @@ def predict(audio_path, model, models, model_base, contrastive=False):
 
 def main():
     audio_path = '../../../../archive/NavaDataset'
-    path = '../main/ensemble.keras'
+    path = '../../output/Dastgah/2 sec/ensemble.keras'
     files = load_files(audio_path + '/test.txt')
-    models_addr = ['../../output/5 classes/Contrastive/1 sec/model_best_classifier_1.keras',
-                   '../../output/5 classes/Contrastive/1 sec/model_best_classifier_2.keras',
-                   '../../output/5 classes/Contrastive/1 sec/model_best_classifier_3.keras',
-                   '../../output/5 classes/Contrastive/1 sec/model_best_classifier_4.keras',
-                   '../../output/5 classes/Contrastive/1 sec/model_best_classifier_5.keras']
+    models_addr = ['../../output/Dastgah/1 sec/model_best_classifier_1.keras',
+                   '../../output/Dastgah/1 sec/model_best_classifier_2.keras',
+                   '../../output/Dastgah/1 sec/model_best_classifier_3.keras',
+                   '../../output/Dastgah/1 sec/model_best_classifier_4.keras',
+                   '../../output/Dastgah/1 sec/model_best_classifier_5.keras']
     model, models, model_base = load_models(path, models_addr, models_addr[0])
     contrastive = False
 
@@ -101,18 +103,18 @@ def predict_segments(segments, model, models, model_base, contrastive=False):
     """Predicts the labels for the given segments using the appropriate model."""
     try:
         if contrastive:
-            predictions = predict_contrastive(segments, model)
+            predictions = predict_contrastive(segments, model, model_base)
         else:
-            meta = get_model_feature(segments, models)
-            predictions = model.predict(meta)
-            # predictions = model_base.predict(segments)
+           # meta = get_model_feature(segments, models)
+           # predictions = model.predict(meta)
+           predictions = model.predict(segments)
         return np.argmax(predictions, axis=1)
     except Exception as e:
         print(f"Error during prediction: {str(e)}")
         return np.array([])
 
 
-def predict_contrastive(segments, model_base):
+def predict_contrastive(segments, model, model_base):
     """Generates predictions using the contrastive learning model."""
     embeddings = generate_embeddings(model_base, segments, 'model')
     return model.predict(embeddings)
@@ -121,21 +123,22 @@ def predict_contrastive(segments, model_base):
 def extract_label(file_name):
     """Extracts the label from the file name."""
     try:
-        return LABEL_MAPPING[int(file_name[0])]
+        return LABEL_MAPPING_dastgah[int(file_name[2])]
     except (IndexError, ValueError, KeyError):
         return None
 
 
 def load_models(addr_model, addr_models, addr_model_base):
     """Loads the required models."""
-    model = load_model(addr_model)
-    models = [load_model(addr_models[0]), load_model(addr_models[1]), load_model(addr_models[2]),
-              load_model(addr_models[3]), load_model(addr_models[4])]
-    model_base = load_model(addr_model_base, custom_objects={
-        'SupervisedContrastiveLoss': SupervisedContrastiveLoss
-    })
-    # models = []
-    # model_base = 2
+    model = load_model(addr_models[0])
+    # model.summary()
+    # models = [load_model(addr_models[0]), load_model(addr_models[1]), load_model(addr_models[2]),
+    #           load_model(addr_models[3]), load_model(addr_models[4])]
+    # model_base = load_model(addr_model_base, custom_objects={
+    #     'SupervisedContrastiveLoss': SupervisedContrastiveLoss
+    # })
+    models = []
+    model_base = 2
     return model, models, model_base
 
 
@@ -161,7 +164,10 @@ def display_predictions(file, predicted_label):
     if predicted_label.size > 0:
         label_counts = Counter(predicted_label)
         for label, count in label_counts.items():
-            class_name = CLASSES[label]
+            if IsDastgahDetection:
+                class_name = Dastgahs[label]
+            else:
+                class_name = CLASSES[label]
             print(f"Class '{class_name}' appears {count} times in predictions for {file}.")
     else:
         print(f"No predictions for {file}.")
@@ -201,7 +207,7 @@ def calculate_class_accuracies(conf_matrix, extended):
     if extended:
         labels = All_LABEL_MAPPING
     else:
-        labels = LABEL_MAPPING
+        labels = LABEL_MAPPING_dastgah
 
     class_accuracies = {}
     for i, class_label in enumerate(labels.values()):
@@ -216,6 +222,8 @@ def display_class_accuracies(class_accuracies, extended):
     """Displays accuracies for each class."""
     if extended:
         classes = All_CLASSES
+    elif IsDastgahDetection:
+        classes = Dastgahs
     else:
         classes = CLASSES
 
@@ -235,6 +243,9 @@ def display_f1_scores(f1_scores, macro_f1_score, extended):
     if extended:
         classes = All_CLASSES
         labels = All_LABEL_MAPPING
+    elif IsDastgahDetection:
+        classes = Dastgahs
+        labels = LABEL_MAPPING_dastgah
     else:
         classes = CLASSES
         labels = LABEL_MAPPING
@@ -248,6 +259,9 @@ def display_precision_recall(precision_scores, recall_scores, macro_precision_sc
     if extended:
         classes = All_CLASSES
         labels = All_LABEL_MAPPING
+    elif IsDastgahDetection:
+        classes = Dastgahs
+        labels = LABEL_MAPPING_dastgah
     else:
         classes = CLASSES
         labels = LABEL_MAPPING

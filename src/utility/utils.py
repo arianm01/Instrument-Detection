@@ -130,20 +130,37 @@ def sanitize_file_name(file_name):
 
 
 def split_into_chunks(X, chunk_size):
-    """Split the input array into chunks of specified size."""
-    chunks = []
-    num_samples, total_length, *rest = X.shape
-    print(X.shape)
-    num_chunks = (total_length + chunk_size - 1) // chunk_size  # Ceiling division
-    for i in range(num_chunks):
-        start = i * chunk_size
-        end = min(start + chunk_size, total_length)
-        chunk = X[:, start:end, ...]
-        # If the chunk is smaller than chunk_size, pad it with zeros
-        if end - start < chunk_size:
-            padding_shape = (num_samples, chunk_size - (end - start), *rest)
-            chunk = np.pad(chunk, [(0, 0), (0, padding_shape[1]), (0, 0), (0, 0)], mode='constant')
-        chunks.append(chunk)
+    """
+    Splits the input array X into chunks of size chunk_size along axis 1.
+    Pads the array if necessary to make the split possible.
+
+    Parameters:
+    - X: np.ndarray, shape (batch_size, dim1, dim2)
+    - chunk_size: int, size of each chunk along axis 1
+    - padding_shape: tuple, padding to apply (only along axis 1)
+
+    Returns:
+    - List of np.ndarray chunks
+    """
+    # Calculate the number of chunks needed
+    dim1 = X.shape[1]
+    remainder = dim1 % chunk_size
+    padding_needed = (chunk_size - remainder) if remainder != 0 else 0
+
+    if padding_needed > 0:
+        # Define pad_width dynamically based on X's dimensions
+        pad_width = [(0, 0)] * X.ndim  # Initialize pad_width for all dimensions
+        pad_width[1] = (0, padding_needed)  # Pad only along axis 1
+
+        # Apply padding
+        X_padded = np.pad(X, pad_width, mode='constant', constant_values=0)
+    else:
+        X_padded = X
+
+    # Now split into chunks
+    num_chunks = X_padded.shape[1] // chunk_size
+    chunks = np.split(X_padded, num_chunks, axis=1)
+
     return chunks
 
 

@@ -1,24 +1,16 @@
 import numpy as np
-import librosa
-from keras import Input, Model
+from keras import Input
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.layers import TimeDistributed, Conv2D, BatchNormalization, MaxPooling2D, Dropout, Flatten, LSTM, Dense, \
     Activation
 from keras.optimizers import Adam
-from keras.regularizers import l2, l1, l1_l2
-from keras.saving.save import load_model
-from sklearn.utils import class_weight
 from tcn import TCN
 from tensorflow.keras import Sequential, callbacks, layers, regularizers, models
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from tensorflow import keras
-import tensorflow as tf
 
 from src.Instrument.Contrastive import create_encoder, add_projection_head, learning_rate, SupervisedContrastiveLoss, \
     create_classifier
-from src.Instrument.ContrastiveLearning import generate_pairs, create_base_network, contrastive_loss, \
-    generate_embeddings
-from src.utility.EuclideanDistanceLayer import EuclideanDistanceLayer
 
 # Set constants for the learning rate schedule
 INITIAL_LEARNING_RATE = 0.0001
@@ -270,13 +262,12 @@ def train_contrastive_model(x, y, num_classes):
         y_labels = y
 
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
-    histories = []
 
     for fold_no, (train_index, test_index) in enumerate(skf.split(x, y_labels), start=1):
         x_train, x_test = x[train_index], x[test_index]
         y_train, y_test = y_labels[train_index], y_labels[test_index]
         y_tr, y_te = y[train_index], y[test_index]
-        batch_size = 32
+        batch_size = 4
 
         model_checkpoint_path = f'model_best_encoder_{fold_no}.keras'
         model_path = f'model_best_classifier_{fold_no}.keras'
@@ -291,7 +282,12 @@ def train_contrastive_model(x, y, num_classes):
         temperature = 0.1
         num_epochs = 100
 
+        # layer_sizes = [512, 256, 128, 64, 32]
+        # layer_sizes = [128, 64, 32, 16, 8]
         layer_sizes = [256, 128, 64, 32, 16]
+
+        # encoder = load_model(f'./model_best_encoder_{fold_no}.keras', custom_objects={
+        #     'SupervisedContrastiveLoss': SupervisedContrastiveLoss}).layers[1]
 
         encoder = create_encoder(layer_sizes, input_shape)
 
@@ -308,11 +304,7 @@ def train_contrastive_model(x, y, num_classes):
 
         classifier = create_classifier(encoder, num_classes, input_shape, trainable=False)
 
-        history = classifier.fit(x=x_train, y=y_tr, batch_size=batch_size, epochs=num_epochs,
-                                 validation_data=(x_test, y_te),
-                                 callbacks=[model_callback, early_stopping, lr_scheduler])
+        classifier.fit(x=x_train, y=y_tr, batch_size=batch_size, epochs=num_epochs, validation_data=(x_test, y_te),
+                       callbacks=[model_callback, early_stopping, lr_scheduler])
 
-        histories.append(history)
         fold_no += 1
-
-    return histories
